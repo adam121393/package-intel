@@ -1,0 +1,24 @@
+node_modules/
+dist/
+*.log
+
+# Every .env variant (including backups like .env.bak.testnet, which hold real
+# private keys) is excluded; only the committed template is allowed through.
+.env*
+!.env.example
+
+# Build caches and local tooling state
+.wrangler/
+.claude/
+.obsidian/
+*.stackdump
+
+# Personal notes, not part of the published project
+What I Want To Know.md
+
+# Secrets — never commit
+cdp_wallet_secret.txt
+cdp_api_key.json
+*api*.txt
+*secret*.txt
+.dev.vars

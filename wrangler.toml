@@ -1,0 +1,18 @@
+name = "marketagent"
+main = "src/proxy-worker.ts"
+compatibility_date = "2026-01-01"
+
+# This Worker is a transparent reverse proxy, NOT the x402 service.
+#
+# The service runs on Node (behind a Cloudflare Tunnel) because Base mainnet
+# does not work on the Workers runtime — verified: Workers+mainnet hangs 40s,
+# Node+mainnet answers in 0.09s. Workers also cannot run the Bazaar discovery
+# extension, whose Ajv validator compiles schemas with `new Function`.
+#
+# The Worker exists purely to give a stable public hostname in front of a quick
+# tunnel, whose hostname changes on every restart.
+[vars]
+ORIGIN = "https://pubmed-sheffield-moving-sierra.trycloudflare.com"
+
+[observability]
+enabled = true

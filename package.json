@@ -1,0 +1,40 @@
+{
+  "name": "package-intel-x402",
+  "version": "0.1.0",
+  "private": true,
+  "description": "x402 pay-per-call package & dependency intelligence API for AI coding agents",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "gen-wallet": "tsx scripts/gen-wallet.ts",
+    "test-buyer": "tsx scripts/test-buyer.ts",
+    "set-origin": "tsx scripts/set-origin.ts",
+    "cdp-check": "tsx scripts/cdp-check.ts",
+    "cdp-wallet": "tsx scripts/cdp-wallet.ts",
+    "mcp": "tsx src/mcp/server.ts"
+  },
+  "dependencies": {
+    "@coinbase/cdp-sdk": "^1.54.0",
+    "@coinbase/x402": "^2.1.0",
+    "@hono/node-server": "^2.0.12",
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@x402/axios": "~2.20.0",
+    "@x402/core": "~2.20.0",
+    "@x402/evm": "~2.20.0",
+    "@x402/extensions": "~2.20.0",
+    "@x402/hono": "~2.20.0",
+    "axios": "^1.19.0",
+    "hono": "^4.12.33",
+    "lru-cache": "^11.5.2",
+    "viem": "^2.55.10",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.23.1",
+    "typescript": "^5.7.3",
+    "wrangler": "^4.118.0"
+  }
+}
