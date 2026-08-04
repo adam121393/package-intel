@@ -22,3 +22,6 @@ cdp_api_key.json
 *api*.txt
 *secret*.txt
 .dev.vars
+
+# Internal planning/strategy doc — kept local, not published
+Claude.md
