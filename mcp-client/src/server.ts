@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { existsSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
@@ -21,8 +22,10 @@ import { z } from "zod";
 
 if (existsSync(".env")) process.loadEnvFile(".env");
 
-const baseURL = process.env.API_URL ?? "http://localhost:4021";
-const network = (process.env.NETWORK ?? "eip155:84532") as `${string}:${string}`;
+// Defaults target the live hosted service, so an install with no configuration
+// at all still works. Point API_URL at localhost to develop against your own.
+const baseURL = process.env.API_URL ?? "https://marketagent.adam121393.workers.dev";
+const network = (process.env.NETWORK ?? "eip155:8453") as `${string}:${string}`;
 const privateKey = process.env.X402_PRIVATE_KEY ?? process.env.BUYER_PRIVATE_KEY;
 
 const plainApi = axios.create({ baseURL, timeout: 60_000 });

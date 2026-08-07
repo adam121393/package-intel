@@ -10,20 +10,47 @@ an explicit config change (see [Going to mainnet](#going-to-mainnet)).
 
 ## Endpoints
 
+Raw passthrough of the upstream sources is **free**: npm, PyPI, OSV and deps.dev are
+themselves free and unauthenticated, so charging for a relay of them prices against zero.
+What gets charged for is the consolidation — the score.
+
 | Endpoint | Method | Price | Returns |
 |---|---|---|---|
-| `/v1/package/:ecosystem/:name` | GET | $0.005 | Consolidated snapshot |
+| `/v1/package/:ecosystem/:name` | GET | free | Consolidated snapshot |
+| `/v1/vulns/:ecosystem/:name` | GET | free | Known vulnerabilities (OSV.dev) |
+| `/v1/deps/:ecosystem/:name` | GET | free | Dependency graph (deps.dev) |
+| `/v1/downloads/:ecosystem/:name` | GET | free | Download counts |
 | `/v1/health/:ecosystem/:name` | GET | $0.01 | Health/risk score 0-100 |
-| `/v1/vulns/:ecosystem/:name` | GET | $0.01 | Known vulnerabilities (OSV.dev) |
-| `/v1/deps/:ecosystem/:name` | GET | $0.02 | Dependency graph (deps.dev) |
-| `/v1/downloads/:ecosystem/:name` | GET | $0.002 | Download counts |
 | `/v1/batch` | POST | $0.02 | Batched health scores (≤50 packages) |
 
-`:ecosystem` is `npm` or `pypi`. Free/unpaid: `/healthz`, `/v1/sample` (canned example
+`:ecosystem` is `npm` or `pypi`. Also unpaid: `/healthz`, `/v1/sample` (canned example
 response), `/.well-known/x402` (discovery manifest).
 
-Prices, descriptions, and discovery metadata all come from `src/catalog.ts` — edit there
-and the payment middleware, manifest, and Bazaar declarations stay in sync.
+Free routes are rate limited to **60/min and 2000/day per caller** — a runaway agent loop
+is how we would get our egress IP blocked by npm or OSV. Paid routes are exempt; their
+price is the limiter. Exceeding a limit returns `429` with `Retry-After`.
+
+Tier, price, description, and discovery metadata all come from `src/catalog.ts` — edit
+there and the payment middleware, rate limiter, manifest, and Bazaar declarations stay in
+sync. `tier` is a required discriminant, so a new endpoint cannot default into being free.
+
+### Trusting the caller's address
+
+The rate limiter counts per client IP, but the service sits behind a Worker proxy and a
+tunnel, so every request arrives from the same address. The proxy forwards the real one as
+`x-stable-ip` **signed with `PROXY_SECRET`**, and the origin honours it only when the
+secret matches. Anything else — wrong secret, no secret, or a request straight to the
+tunnel hostname — shares a single bucket. Without that signature a caller could forge a
+fresh address per request, or skip the proxy, and get unmetered upstream fan-out.
+
+Set the same value in both places:
+
+```bash
+# .env for the origin, plus:
+npx wrangler secret put PROXY_SECRET
+```
+
+The server warns at startup if it is missing on mainnet.
 
 ## Local setup (testnet)
 
@@ -66,25 +93,32 @@ skips settlement entirely on any 4xx/5xx response, so failures are free.
 
 ## MCP server (how agents consume this)
 
-`src/mcp/server.ts` is a stdio MCP server that runs on the *buyer's* machine, exposing six
-tools (`package_health`, `package_vulns`, `package_deps`, `package_snapshot`,
-`package_downloads`, `package_batch_health`). Each tool calls the paid HTTP API and, on a
-402, signs a USDC payment from the configured wallet and retries — the agent just sees data.
+`mcp-client/` is a standalone npm package (`package-intel-mcp`) — a stdio MCP server that
+runs on the *buyer's* machine. It is published separately from this server so an install
+does not drag in Hono and the x402 server stack; it imports nothing from `src/`.
 
-Add to Claude Desktop (`claude_desktop_config.json`) or Cursor (`mcp.json`):
+**It runs with no configuration at all.** With no wallet it registers the four free tools
+(`package_snapshot`, `package_vulns`, `package_deps`, `package_downloads`). Requiring a
+funded hot wallet before the tool did anything was the single biggest adoption blocker, so
+that is now the default path, not an error.
+
+```bash
+claude mcp add package-intel -- npx -y package-intel-mcp
+```
+
+Setting `X402_PRIVATE_KEY` additionally registers `package_health` and
+`package_batch_health`, which call the paid endpoints and, on a 402, sign a USDC payment
+from that wallet and retry — the agent just sees data. A malformed key is a hard error
+rather than a silent drop back to free mode, since that would look like the paid tools
+vanishing for no reason.
 
 ```json
 {
   "mcpServers": {
     "package-intel": {
       "command": "npx",
-      "args": ["tsx", "src/mcp/server.ts"],
-      "cwd": "/absolute/path/to/project",
-      "env": {
-        "API_URL": "https://api.yourdomain.com",
-        "NETWORK": "eip155:8453",
-        "X402_PRIVATE_KEY": "0x..."
-      }
+      "args": ["-y", "package-intel-mcp"],
+      "env": { "X402_PRIVATE_KEY": "0x..." }
     }
   }
 }
@@ -92,6 +126,15 @@ Add to Claude Desktop (`claude_desktop_config.json`) or Cursor (`mcp.json`):
 
 `X402_PRIVATE_KEY` is the *agent operator's* wallet, funded with USDC on `NETWORK`. Use a
 dedicated low-balance wallet — it is a hot key that spends automatically.
+
+To run it from source against a local server: `npm run mcp`.
+
+### Getting an agent to actually call it
+
+Installing a tool does not make an agent reach for it. A line in the consuming repo's
+`AGENTS.md` / `CLAUDE.md` / `.cursor/rules` does, on every relevant task — that is the
+mechanism that produces recurring invocation, not registry listings. `mcp-client/README.md`
+ships a copy-paste block for this.
 
 ## Coinbase CDP setup
 

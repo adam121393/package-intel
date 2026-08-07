@@ -14,7 +14,7 @@
     "set-origin": "tsx scripts/set-origin.ts",
     "cdp-check": "tsx scripts/cdp-check.ts",
     "cdp-wallet": "tsx scripts/cdp-wallet.ts",
-    "mcp": "tsx src/mcp/server.ts"
+    "mcp": "tsx mcp-client/src/server.ts"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "^1.54.0",
