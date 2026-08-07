@@ -111,7 +111,8 @@ edge locations still run the previous Worker version.
 
 ### MCP server
 
-`src/mcp/server.ts` stops exiting when no key is present.
+The MCP server (moved to `mcp-client/src/server.ts` — see Packaging) stops
+exiting when no key is present.
 
 - **No wallet:** registers `package_snapshot`, `package_vulns`, `package_deps`,
   `package_downloads`.
@@ -131,8 +132,12 @@ A new `mcp-client/` directory with its own `package.json`, published as
 `package-intel-mcp` (verified available on npm 2026-08-07). The root package
 depends on `hono`, `@hono/node-server`, `@x402/hono`, `@coinbase/x402` and
 `lru-cache`, none of which a buyer needs; publishing the root would make every
-`npx` install pull the whole server stack. `src/mcp/server.ts` imports nothing
-from `src/`, so it lifts out cleanly.
+`npx` install pull the whole server stack. The MCP server imports nothing from
+`src/`, so it is *moved* rather than copied — `src/mcp/server.ts` becomes
+`mcp-client/src/server.ts`, leaving one copy that cannot drift.
+
+Its defaults change from `http://localhost:4021` / Base Sepolia to the hosted
+URL / Base mainnet, since a published package pointing at localhost is useless.
 
 - `bin` → `dist/server.js`, with a `#!/usr/bin/env node` shim.
 - Dependencies: `@modelcontextprotocol/sdk`, `@x402/axios`, `@x402/evm`,
