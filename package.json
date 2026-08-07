@@ -8,6 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "gen-wallet": "tsx scripts/gen-wallet.ts",
     "test-buyer": "tsx scripts/test-buyer.ts",
     "set-origin": "tsx scripts/set-origin.ts",
@@ -35,6 +36,7 @@
     "@types/node": "^22.13.4",
     "tsx": "^4.23.1",
     "typescript": "^5.7.3",
+    "vitest": "^4.1.10",
     "wrangler": "^4.118.0"
   }
 }

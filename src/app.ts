@@ -4,8 +4,9 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
 import { Hono } from "hono";
-import { CATALOG, PATH_PARAMS_SCHEMA, SERVICE_TAGS } from "./catalog.js";
+import { freeRouteSegments, paidEntries, PATH_PARAMS_SCHEMA, SERVICE_TAGS } from "./catalog.js";
 import { getConfig } from "./config.js";
+import { RateLimiter, resolveRateLimitKey } from "./rateLimit.js";
 import { registerBatchRoute } from "./routes/batch.js";
 import { registerDepsRoute } from "./routes/deps.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
@@ -41,6 +42,31 @@ export function createApp(): Hono {
     await next();
   });
 
+  // Free routes are metered so a runaway agent loop cannot get our egress IP
+  // blocked by npm/OSV/deps.dev. Paid routes are exempt: their price is the
+  // limiter. The set is derived from the catalog so retiering an endpoint
+  // cannot leave the limiter pointed at the wrong routes.
+  const limiter = new RateLimiter();
+  const freeSegments = freeRouteSegments();
+
+  app.use("/v1/*", async (c, next) => {
+    const segment = c.req.path.split("/").filter(Boolean)[1];
+    if (!segment || !freeSegments.has(segment)) return next();
+
+    const verdict = limiter.check(resolveRateLimitKey(c.req.raw.headers, config.proxySecret));
+    if (verdict.allowed) return next();
+
+    return c.json(
+      {
+        error: `Free tier rate limit exceeded (per-${verdict.window} cap).`,
+        retryAfterSeconds: verdict.retryAfterSeconds,
+        hint: "Paid endpoints are not rate limited — see /.well-known/x402.",
+      },
+      429,
+      { "Retry-After": String(verdict.retryAfterSeconds) },
+    );
+  });
+
   // On mainnet the CDP facilitator settles real USDC and auto-catalogs this
   // service in the Bazaar on first successful settlement. Testnet uses the
   // public no-auth facilitator unless USE_CDP_FACILITATOR opts in.
@@ -51,8 +77,10 @@ export function createApp(): Hono {
     new ExactEvmScheme(),
   );
 
+  // Only paid entries get a payment requirement; free ones are simply absent
+  // from the map, so the middleware passes them straight through.
   const routes = Object.fromEntries(
-    CATALOG.map((entry) => [
+    paidEntries().map((entry) => [
       entry.route,
       {
         accepts: {

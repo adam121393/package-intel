@@ -1,15 +1,16 @@
 import type { Hono } from "hono";
-import { CATALOG, type CatalogEntry, SERVICE_TAGS } from "../catalog.js";
+import { CATALOG, type CatalogEntry, isPaid, SERVICE_TAGS } from "../catalog.js";
 import { getConfig } from "../config.js";
 
 /**
  * Builds a concrete, probeable URL for a catalog entry.
  *
- * Indexers auto-probe the advertised `resource` URL and only list endpoints
- * that answer 402. Advertising the raw template (".../:ecosystem/:name") makes
- * the probe hit our ecosystem validation and get a 400 instead, which silently
- * prevents listing — so real sample values are substituted here, same reason
- * the Bazaar declaration uses real path params.
+ * Indexers auto-probe the advertised `resource` URL, and for paid entries only
+ * list the ones that answer 402. Advertising the raw template
+ * (".../:ecosystem/:name") makes the probe hit our ecosystem validation and get
+ * a 400 instead, which silently prevents listing — so real sample values are
+ * substituted here, same reason the Bazaar declaration uses real path params.
+ * Free entries are probed the same way and answer 200.
  */
 function sampleUrl(entry: CatalogEntry): string {
   const config = getConfig();
@@ -40,9 +41,26 @@ interface EndpointRow {
   description: string;
 }
 
-function indexHtml(endpoints: EndpointRow[]): string {
-  const config = getConfig();
-  const rows = endpoints
+/** Splits the catalog into the two tiers the index and manifest advertise. */
+function endpointRows(): { free: EndpointRow[]; paid: EndpointRow[] } {
+  const rows = CATALOG.map((entry) => {
+    const [method, path] = entry.route.split(" ") as [string, string];
+    return {
+      method,
+      path,
+      price: isPaid(entry) ? entry.price : "free",
+      description: entry.description,
+      tier: entry.tier,
+    };
+  });
+  return {
+    free: rows.filter((r) => r.tier === "free"),
+    paid: rows.filter((r) => r.tier === "paid"),
+  };
+}
+
+function table(rows: EndpointRow[]): string {
+  const body = rows
     .map(
       (e) => `<tr>
       <td><code>${e.method}</code></td>
@@ -52,6 +70,17 @@ function indexHtml(endpoints: EndpointRow[]): string {
     </tr>`,
     )
     .join("\n");
+
+  return `<table>
+    <thead><tr><th>Method</th><th>Path</th><th>Price</th><th>Description</th></tr></thead>
+    <tbody>
+${body}
+    </tbody>
+  </table>`;
+}
+
+function indexHtml(free: EndpointRow[], paid: EndpointRow[]): string {
+  const config = getConfig();
 
   return `<!doctype html>
 <html lang="en">
@@ -82,9 +111,13 @@ function indexHtml(endpoints: EndpointRow[]): string {
 </head>
 <body>
   <h1>${escapeHtml(config.serviceName)}</h1>
-  <p class="sub">Package &amp; dependency intelligence for AI coding agents, paid per call over x402.</p>
+  <p class="sub">Package &amp; dependency intelligence for AI coding agents. Raw package data is
+  free; the consolidated score is paid per call over x402.</p>
 
   <h2>Free endpoints</h2>
+  <p class="sub">No payment, no key. Rate limited per caller; see the response headers on a
+  <code>429</code>.</p>
+  ${table(free)}
   <ul>
     <li><a href="/v1/sample"><code>/v1/sample</code></a> — example response, no payment</li>
     <li><a href="/.well-known/x402"><code>/.well-known/x402</code></a> — machine-readable manifest</li>
@@ -94,12 +127,7 @@ function indexHtml(endpoints: EndpointRow[]): string {
   <h2>Paid endpoints</h2>
   <p class="sub">Requests without payment return <code>402</code> with instructions. Not-found and
   upstream failures return 4xx/5xx and are never charged.</p>
-  <table>
-    <thead><tr><th>Method</th><th>Path</th><th>Price</th><th>Description</th></tr></thead>
-    <tbody>
-${rows}
-    </tbody>
-  </table>
+  ${table(paid)}
 
   <div class="meta">
     Network <code>${escapeHtml(config.network)}</code>${config.isMainnet ? "" : " (testnet)"} ·
@@ -121,22 +149,24 @@ export function registerDiscoveryRoutes(app: Hono) {
   // Index. Browsers get a readable page; API clients get JSON. Without this,
   // hitting the bare origin 404s, which reads as "the server is broken".
   app.get("/", (c) => {
-    const endpoints = CATALOG.map((entry) => {
-      const [method, path] = entry.route.split(" ") as [string, string];
-      return { method, path, price: entry.price, description: entry.description };
-    });
+    const { free, paid } = endpointRows();
 
     if (!c.req.header("accept")?.includes("text/html")) {
       return c.json({
         name: config.serviceName,
         network: config.network,
         payTo: config.payTo,
-        free: ["/healthz", "/v1/sample", "/.well-known/x402"],
-        paid: endpoints,
+        free: [
+          ...free.map(({ method, path, description }) => ({ method, path, description })),
+          { method: "GET", path: "/healthz", description: "Health check." },
+          { method: "GET", path: "/v1/sample", description: "Canned example response." },
+          { method: "GET", path: "/.well-known/x402", description: "Machine-readable manifest." },
+        ],
+        paid,
       });
     }
 
-    return c.html(indexHtml(endpoints));
+    return c.html(indexHtml(free, paid));
   });
 
   app.get("/healthz", (c) => c.json({ ok: true }));
@@ -145,7 +175,7 @@ export function registerDiscoveryRoutes(app: Hono) {
   app.get("/v1/sample", (c) => {
     const health = CATALOG.find((e) => e.route.includes("/v1/health"));
     return c.json({
-      note: "Static sample response. Live data requires payment — see /.well-known/x402.",
+      note: "Static sample of the paid health score. Raw package data (snapshot, vulns, deps, downloads) is free and needs no payment — see /.well-known/x402.",
       example: health?.outputExample,
     });
   });
@@ -168,15 +198,23 @@ export function registerDiscoveryRoutes(app: Hono) {
           description: entry.description,
           mimeType: "application/json",
           ...(entry.body ? { sampleBody: entry.body } : {}),
-          accepts: [
-            {
-              scheme: "exact",
-              network: config.network,
-              price: entry.price,
-              payTo: config.payTo,
-              asset: "USDC",
-            },
-          ],
+          // Free resources carry no `accepts` block at all: an empty or
+          // zero-priced one would read to an indexer as a malformed payment
+          // requirement rather than as "no payment needed".
+          ...(isPaid(entry)
+            ? {
+                price: entry.price,
+                accepts: [
+                  {
+                    scheme: "exact",
+                    network: config.network,
+                    price: entry.price,
+                    payTo: config.payTo,
+                    asset: "USDC",
+                  },
+                ],
+              }
+            : { price: "free" }),
         };
       }),
     }),

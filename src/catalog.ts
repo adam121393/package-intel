@@ -8,10 +8,9 @@
  * breaks indexing or, worse, misprices calls.
  */
 
-export interface CatalogEntry {
+interface BaseCatalogEntry {
   /** Route key in "METHOD /path" form, as the x402 middleware expects. */
   route: string;
-  price: string;
   description: string;
   /**
    * Sample request. For path-param routes this MUST use a real, valid
@@ -25,6 +24,30 @@ export interface CatalogEntry {
   body?: Record<string, unknown>;
   bodyType?: "json";
   outputExample: unknown;
+}
+
+/**
+ * Raw upstream data (npm/PyPI/OSV/deps.dev passthrough) is free: it is already
+ * available without auth from the sources themselves, so charging for it prices
+ * against zero. The consolidated score is what we actually add, and it is what
+ * we charge for.
+ *
+ * The tier is a required discriminant rather than an optional flag, so a new
+ * entry cannot silently default into being given away.
+ */
+export interface PaidCatalogEntry extends BaseCatalogEntry {
+  tier: "paid";
+  price: string;
+}
+
+export interface FreeCatalogEntry extends BaseCatalogEntry {
+  tier: "free";
+}
+
+export type CatalogEntry = PaidCatalogEntry | FreeCatalogEntry;
+
+export function isPaid(entry: CatalogEntry): entry is PaidCatalogEntry {
+  return entry.tier === "paid";
 }
 
 /**
@@ -63,7 +86,7 @@ const HEALTH_EXAMPLE = {
 export const CATALOG: CatalogEntry[] = [
   {
     route: "GET /v1/package/:ecosystem/:name",
-    price: "$0.005",
+    tier: "free",
     description:
       "Consolidated npm/PyPI package snapshot: latest version, license, description, repository, weekly downloads, maintainer count, last publish date, deprecation status.",
     pathParams: { ecosystem: "npm", name: "express" },
@@ -82,6 +105,7 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     route: "GET /v1/health/:ecosystem/:name",
+    tier: "paid",
     price: "$0.01",
     description:
       "Package health & risk score (0-100) for an npm or PyPI package, with maintenance/popularity/security/freshness sub-scores and a human-readable rationale. Vulnerabilities are scoped to the current version.",
@@ -90,7 +114,7 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     route: "GET /v1/vulns/:ecosystem/:name",
-    price: "$0.01",
+    tier: "free",
     description:
       "Known vulnerabilities from OSV.dev for an npm or PyPI package. Pass ?version= to scope results to a specific version; omit it for all advisories ever filed against the package.",
     pathParams: { ecosystem: "npm", name: "express" },
@@ -105,7 +129,7 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     route: "GET /v1/deps/:ecosystem/:name",
-    price: "$0.02",
+    tier: "free",
     description:
       "Dependency graph from deps.dev for an npm or PyPI package: direct and transitive dependencies with versions, counts, and deprecated direct dependencies flagged.",
     pathParams: { ecosystem: "npm", name: "express" },
@@ -123,7 +147,7 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     route: "GET /v1/downloads/:ecosystem/:name",
-    price: "$0.002",
+    tier: "free",
     description:
       "Download counts for an npm or PyPI package. npm supports ?range=last-day|last-week|last-month|last-year; PyPI returns last-week.",
     pathParams: { ecosystem: "npm", name: "express" },
@@ -139,6 +163,7 @@ export const CATALOG: CatalogEntry[] = [
   },
   {
     route: "POST /v1/batch",
+    tier: "paid",
     price: "$0.02",
     description:
       "Batched health scores for up to 50 npm/PyPI packages in one call — designed for scoring an entire dependency manifest (package.json / requirements.txt) at once.",
@@ -152,6 +177,24 @@ export const CATALOG: CatalogEntry[] = [
     outputExample: { results: [{ ...HEALTH_EXAMPLE, found: true }] },
   },
 ];
+
+/** Entries that require payment. The x402 route map is built from exactly these. */
+export function paidEntries(): PaidCatalogEntry[] {
+  return CATALOG.filter(isPaid);
+}
+
+/**
+ * The path segment after `/v1` for each free route, e.g. "vulns". The rate
+ * limiter matches on these, so retiering an endpoint moves its metering with
+ * it rather than leaving the limiter pointed at a route that now costs money.
+ */
+export function freeRouteSegments(): Set<string> {
+  return new Set(
+    CATALOG.filter((entry) => !isPaid(entry)).map(
+      (entry) => entry.route.split(" ")[1]?.split("/")[2] ?? "",
+    ),
+  );
+}
 
 export const SERVICE_TAGS = [
   "npm",

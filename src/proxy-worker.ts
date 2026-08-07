@@ -16,6 +16,13 @@
 
 interface Env {
   ORIGIN?: string;
+  /**
+   * Shared with the origin. Proves the forwarded client address came from this
+   * Worker; without it the origin cannot distinguish our header from one the
+   * caller invented, and the free-tier rate limit is bypassable.
+   * Set with: npx wrangler secret put PROXY_SECRET
+   */
+  PROXY_SECRET?: string;
 }
 
 /** Hop-by-hop and Cloudflare-injected headers that must not be forwarded upstream. */
@@ -31,6 +38,12 @@ const STRIP_REQUEST_HEADERS = new Set([
   "cf-visitor",
   "x-forwarded-proto",
   "x-real-ip",
+  // Client-supplied values for headers we set ourselves below, dropped so a
+  // caller cannot pre-seed them and impersonate the proxy.
+  "x-stable-host",
+  "x-stable-proto",
+  "x-stable-ip",
+  "x-proxy-secret",
 ]);
 
 export default {
@@ -59,6 +72,18 @@ export default {
     // tunnel's own hostname, so the standard header cannot survive the hop.
     headers.set("x-stable-host", incoming.host);
     headers.set("x-stable-proto", incoming.protocol.replace(":", ""));
+
+    // The origin meters its free tier per caller, but sits behind this proxy and
+    // a tunnel, so every request reaches it from the same address. Forward the
+    // real one, signed with the shared secret — the origin ignores an unsigned
+    // address and buckets those requests together, since the tunnel hostname is
+    // directly reachable and anyone could otherwise forge a fresh address per
+    // request to get unlimited free upstream calls.
+    const clientIp = request.headers.get("cf-connecting-ip");
+    if (clientIp && env.PROXY_SECRET) {
+      headers.set("x-stable-ip", clientIp);
+      headers.set("x-proxy-secret", env.PROXY_SECRET);
+    }
 
     try {
       const upstream = await fetch(target.toString(), {

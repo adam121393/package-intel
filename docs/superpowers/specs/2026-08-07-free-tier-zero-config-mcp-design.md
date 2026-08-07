@@ -22,7 +22,9 @@ pricing surface.
 
 1. `npx -y package-intel-mcp` works with no wallet, no API key, no config.
 2. Raw package data is free; the consolidated score stays paid.
-3. The free tier cannot get our upstream sources (npm, OSV, deps.dev) to rate-limit us.
+3. A caller cannot get our upstream sources (npm, OSV, deps.dev) to rate-limit
+   us — including by forging the header the limiter counts on, or by skipping
+   the proxy and hitting the tunnel directly.
 4. The package is publishable to npm and submittable to the MCP Registry.
 
 ## Non-goals
@@ -72,23 +74,37 @@ current revenue is zero.
 
 ### Rate limiting
 
-New `src/rateLimit.ts`. In-memory token bucket, applied to free routes only —
-paid routes are limited by their price.
+New `src/rateLimit.ts`. In-memory fixed-window counters, applied to free routes
+only — paid routes are limited by their price. Two integers per key rather than
+a rolling timestamp log, since bounding memory under abusive traffic is the
+whole point. The cost is that a caller can send up to 2x the limit across a
+window boundary, which does not matter for protecting upstreams.
 
 - 60 requests/minute and 2000/day per client IP.
 - Exceeding either returns `429` with `Retry-After` and a message naming the
   paid tier as the unmetered alternative.
-- Buckets live in an LRU-bounded map (cap 10,000 IPs) so forged or spread
+- Counters live in an LRU-bounded map (cap 10,000 keys) so forged or spread
   source addresses cannot grow it without bound.
 - State is per-process and resets on restart. Acceptable: the limit exists to
   protect upstream sources from a runaway loop, not to enforce a quota.
 
-Client IP is not currently visible to the origin — `src/proxy-worker.ts:29`
-strips `cf-connecting-ip`. The proxy will re-emit it as `x-stable-ip` before
-stripping, mirroring the existing `x-stable-host` mechanism. The server reads
-`x-stable-ip` and falls back to the socket address for direct/local requests.
-A request arriving through the proxy without `x-stable-ip` is treated as a
-single shared bucket rather than being allowed through unlimited.
+**Trusting the client address.** The origin sits behind the Worker and a tunnel,
+so every request arrives from the same address, and `src/proxy-worker.ts` strips
+`cf-connecting-ip`. Forwarding it as a header is not enough on its own: headers
+are client-settable, and the tunnel hostname is directly reachable, so a caller
+could forge a fresh address per request — or skip the proxy entirely — and get
+unmetered upstream fan-out.
+
+The proxy therefore sends `x-stable-ip` alongside `x-proxy-secret`, a shared
+secret configured on both sides (`PROXY_SECRET`). The origin honours a forwarded
+address only when the secret matches; anything else — wrong secret, no secret,
+or no forwarded address at all — falls into one shared bucket, so bypassing the
+proxy caps the bypasser rather than freeing them. The proxy also strips any
+client-supplied copy of these headers before setting its own.
+
+With no secret configured the header is taken at face value, which is right for
+local development and wrong in production, so the server warns at startup when
+it is missing on mainnet.
 
 Deploying the proxy change reintroduces the 1–3 minute window in which some
 edge locations still run the previous Worker version.

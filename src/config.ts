@@ -18,6 +18,12 @@ export interface AppConfig {
   bazaarEnabled: boolean;
   /** Blocking facilitator sync at startup. */
   syncFacilitator: boolean;
+  /**
+   * Shared secret proving that `x-stable-ip` came from our own Worker proxy
+   * rather than from the caller. Without it the free-tier rate limit is
+   * trivially bypassed by forging that header — see src/rateLimit.ts.
+   */
+  proxySecret?: string;
 }
 
 /**
@@ -88,7 +94,16 @@ export function getConfig(): AppConfig {
     serviceName: process.env.SERVICE_NAME ?? "Package & Dependency Intelligence",
     bazaarEnabled: process.env.BAZAAR_ENABLED !== "false",
     syncFacilitator: process.env.SYNC_FACILITATOR !== "false",
+    proxySecret: process.env.PROXY_SECRET,
   };
+
+  if (cached.isMainnet && !cached.proxySecret) {
+    console.warn(
+      "PROXY_SECRET is not set. Free-tier rate limiting will trust the x-stable-ip\n" +
+        "header as sent, which any caller can forge. Set the same value here and in\n" +
+        "the Worker (npx wrangler secret put PROXY_SECRET) to close that.",
+    );
+  }
 
   return cached;
 }
