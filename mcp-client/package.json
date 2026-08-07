@@ -29,6 +29,12 @@
     "ai-agents"
   ],
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Optirefine/package-intel.git",
+    "directory": "mcp-client"
+  },
+  "homepage": "https://github.com/Optirefine/package-intel#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@x402/axios": "~2.20.0",

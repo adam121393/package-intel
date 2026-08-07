@@ -1,0 +1,41 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.optirefine/package-intel",
+  "description": "Health scores, dependency graphs, and vulnerability data for npm and PyPI packages. Lets a coding agent check whether a dependency is safe, maintained, and current before adding it. Pay-per-call in USDC over x402.",
+  "status": "active",
+  "version": "1.0.0",
+  "repository": {
+    "url": "https://github.com/Optirefine/package-intel",
+    "source": "github"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "package-intel-mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "API_URL",
+          "description": "Base URL of the paid API.",
+          "default": "https://marketagent.adam121393.workers.dev",
+          "isRequired": false
+        },
+        {
+          "name": "NETWORK",
+          "description": "CAIP-2 network id for payments. eip155:8453 is Base mainnet.",
+          "default": "eip155:8453",
+          "isRequired": false
+        },
+        {
+          "name": "X402_PRIVATE_KEY",
+          "description": "Private key of a wallet funded with USDC on NETWORK, used to pay per call. Use a dedicated low-balance wallet: this is a hot key that spends automatically.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
