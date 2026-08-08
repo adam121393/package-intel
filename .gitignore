@@ -37,3 +37,6 @@ Untitled.*
 
 # npm pack output
 *.tgz
+
+# npm auth — never commit
+.npmrc
