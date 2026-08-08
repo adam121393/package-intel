@@ -1,17 +1,22 @@
+import type { Hono } from "hono";
+import { createFreeApp, isFreeRoute } from "./freeApp.js";
+
 /**
- * Stable-URL reverse proxy.
+ * Edge front door: serves the free tier itself, proxies the paid tier.
  *
- * The x402 service itself runs on a Node host (a PC behind a Cloudflare Tunnel),
- * because Base mainnet does not work on the Workers runtime. Quick tunnels get a
- * new random hostname on every restart, which is useless for discovery listings —
- * so this Worker sits at a fixed workers.dev address and forwards everything to
- * whatever the current tunnel hostname is.
+ * The paid routes need Base mainnet, which does not work on the Workers runtime,
+ * so they still go to a Node host behind a Cloudflare Tunnel. Payment headers
+ * (PAYMENT-REQUIRED / PAYMENT-SIGNATURE / PAYMENT-RESPONSE) pass through
+ * untouched, so the mainnet incompatibility never applies here.
  *
- * It deliberately does no x402 logic: it is a transparent pass-through, so the
- * payment headers (PAYMENT-REQUIRED / PAYMENT-SIGNATURE / PAYMENT-RESPONSE)
- * flow through untouched and the Workers mainnet incompatibility never applies.
+ * The free routes have no such constraint — they are fetch-and-cache over public
+ * APIs — so they are answered at the edge and no longer depend on the origin PC
+ * being awake. That machine's tunnel died three times in two days while
+ * cloudflared still reported healthy connections, and the free tools are what
+ * every new install touches, so this is the difference between "occasionally
+ * down" and "up".
  *
- * Update the target with:  npm run set-origin -- https://<new>.trycloudflare.com
+ * Update the proxy target with:  npm run set-origin -- https://<new>.trycloudflare.com
  */
 
 interface Env {
@@ -46,8 +51,32 @@ const STRIP_REQUEST_HEADERS = new Set([
   "x-proxy-secret",
 ]);
 
+// Built once per isolate and reused, so the LRU cache behind the sources stays
+// warm across requests instead of being discarded each time.
+let freeApp: Hono | undefined;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+
+    // Free tier, served here. Never touches the origin, so it stays up when the
+    // origin PC does not.
+    if (isFreeRoute(url.pathname)) {
+      freeApp ??= createFreeApp({
+        // Set by the runtime and not forgeable by the caller, so unlike the
+        // origin this needs no shared secret to be trustworthy.
+        clientKey: (req) => req.headers.get("cf-connecting-ip") ?? "unknown",
+      });
+      const response = await freeApp.fetch(request);
+      const headers = new Headers(response.headers);
+      headers.set("X-Served-By", "edge");
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+
     const origin = env.ORIGIN;
     if (!origin) {
       return Response.json(
@@ -56,8 +85,33 @@ export default {
       );
     }
 
-    const incoming = new URL(request.url);
-    const target = new URL(incoming.pathname + incoming.search, origin);
+    // Health is answered at the edge and reports each tier separately. Proxied,
+    // it would return 503 whenever the origin slept, which reads as a total
+    // outage — but the free tier, which is what installs actually use, is still
+    // up. Monitoring should be able to tell those two apart.
+    if (url.pathname === "/healthz") {
+      const paidUp = await fetch(new URL("/healthz", origin).toString(), {
+        method: "GET",
+        signal: AbortSignal.timeout(5_000),
+      })
+        .then((r) => r.ok)
+        .catch(() => false);
+
+      return Response.json(
+        {
+          ok: true,
+          free: { ok: true, servedBy: "edge" },
+          paid: {
+            ok: paidUp,
+            servedBy: "origin",
+            ...(paidUp ? {} : { detail: "Origin unreachable; paid endpoints are unavailable." }),
+          },
+        },
+        { status: 200, headers: { "X-Served-By": "edge" } },
+      );
+    }
+
+    const target = new URL(url.pathname + url.search, origin);
 
     const headers = new Headers();
     for (const [key, value] of request.headers) {
@@ -70,8 +124,8 @@ export default {
     // those URLs (Bazaar, indexers) would break as soon as the tunnel cycled.
     // A custom header name: cloudflared overwrites x-forwarded-host with the
     // tunnel's own hostname, so the standard header cannot survive the hop.
-    headers.set("x-stable-host", incoming.host);
-    headers.set("x-stable-proto", incoming.protocol.replace(":", ""));
+    headers.set("x-stable-host", url.host);
+    headers.set("x-stable-proto", url.protocol.replace(":", ""));
 
     // The origin meters its free tier per caller, but sits behind this proxy and
     // a tunnel, so every request reaches it from the same address. Forward the
