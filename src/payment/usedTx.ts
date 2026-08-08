@@ -9,8 +9,19 @@
  */
 
 export interface UsedTxStore {
-  /** Returns true if this hash was previously unused and is now claimed. */
+  /**
+   * Reserves a hash. Returns true if it was previously unspent.
+   *
+   * A claim is provisional: it blocks concurrent double-spends immediately, but
+   * is only made permanent by `commit`. This mirrors x402, which never settles
+   * a payment for a response of 400 or worse — a caller whose request fails
+   * must be able to retry with the same payment.
+   */
   claim(txHash: string): boolean;
+  /** Makes a claim permanent, after the request was actually served. */
+  commit(txHash: string): void;
+  /** Returns an unserved claim to the pool, so the payment is not consumed. */
+  release(txHash: string): void;
   size(): number;
 }
 
@@ -29,15 +40,22 @@ export class MemoryUsedTxStore implements UsedTxStore {
     const key = txHash.toLowerCase();
     if (this.used.has(key)) return false;
     this.used.add(key);
-    this.onClaimed(key);
     return true;
+  }
+
+  commit(txHash: string): void {
+    this.onCommitted(txHash.toLowerCase());
+  }
+
+  release(txHash: string): void {
+    this.used.delete(txHash.toLowerCase());
   }
 
   size(): number {
     return this.used.size;
   }
 
-  protected onClaimed(_key: string): void {
+  protected onCommitted(_key: string): void {
     // Overridden by the durable subclass.
   }
 }
@@ -81,9 +99,11 @@ export class FileUsedTxStore extends MemoryUsedTxStore {
     return store;
   }
 
-  protected override onClaimed(key: string): void {
-    // Serialised so concurrent claims cannot interleave partial lines, and
-    // detached from the claim itself so disk latency never delays a response.
+  protected override onCommitted(key: string): void {
+    // Only committed spends reach the ledger, so a request that failed after
+    // claiming leaves no trace and its payment survives a restart.
+    // Serialised so concurrent writes cannot interleave partial lines, and
+    // detached from the request so disk latency never delays a response.
     this.appendQueue = this.appendQueue
       .then(() => this.fs.appendFile(this.path, `${key}\t${Date.now()}\n`, "utf8"))
       .catch((err) => {

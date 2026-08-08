@@ -111,6 +111,35 @@ describe("single-use transaction ledger", () => {
     expect(store.size()).toBe(2);
   });
 
+  it("frees a claim that was never served, so the payment survives", () => {
+    // The regression: the batch route validates its body inside the handler,
+    // which runs after the gate claims. Without release-on-error a malformed
+    // request burned a real payment and returned 400 — charged, nothing
+    // served, and the hash unusable for the corrected retry.
+    const store = new MemoryUsedTxStore();
+    const hash = `0x${"d".repeat(64)}`;
+    expect(store.claim(hash)).toBe(true);
+    store.release(hash);
+    expect(store.claim(hash), "a released hash must be spendable again").toBe(true);
+  });
+
+  it("consumes a committed claim permanently", () => {
+    const store = new MemoryUsedTxStore();
+    const hash = `0x${"e".repeat(64)}`;
+    expect(store.claim(hash)).toBe(true);
+    store.commit(hash);
+    expect(store.claim(hash), "a committed hash must never be reusable").toBe(false);
+  });
+
+  it("still blocks a second caller while a claim is in flight", () => {
+    // Release must not open a double-spend window: while the first request is
+    // being served, the hash is unavailable to anyone else.
+    const store = new MemoryUsedTxStore();
+    const hash = `0x${"f".repeat(64)}`;
+    expect(store.claim(hash)).toBe(true);
+    expect(store.claim(hash)).toBe(false);
+  });
+
   it("claims atomically across concurrent callers", async () => {
     // claim() must not await between checking and inserting, or two requests
     // presenting the same hash could both be served.

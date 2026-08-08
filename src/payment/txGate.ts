@@ -163,16 +163,37 @@ export function createTxPaymentGate(
       return c.json(challenge(entry, config, verdict.reason), 402);
     }
 
-    // Claimed only after the payment is proven, and before anything is served,
-    // so a hash cannot be spent twice even by two simultaneous requests.
-    const claimed = (await store()).claim(txHash);
-    if (!claimed) {
+    // Claimed before serving so two simultaneous requests cannot both spend one
+    // hash, but only *committed* once the response proves the caller got
+    // something. x402 never settles a payment for a 400-or-worse response, and
+    // the tx_hash path must not either: the batch route validates its body
+    // inside the handler, so without this a malformed request would burn a real
+    // payment and return an error — charged, nothing served, hash unusable.
+    const ledger = await store();
+    if (!ledger.claim(txHash)) {
       return c.json(
         challenge(entry, config, "that transaction has already been used to pay for a call"),
         402,
       );
     }
 
+    c.header("X-Payment-Method", "tx_hash");
+    c.header("X-Payment-Tx", txHash.toLowerCase());
+
+    try {
+      await next();
+    } catch (err) {
+      ledger.release(txHash);
+      throw err;
+    }
+
+    const status = c.res?.status ?? 500;
+    if (status >= 400) {
+      ledger.release(txHash);
+      return;
+    }
+
+    ledger.commit(txHash);
     console.log(
       JSON.stringify({
         event: "tx_payment_accepted",
@@ -182,11 +203,8 @@ export function createTxPaymentGate(
         from: verdict.from,
         txHash: txHash.toLowerCase(),
         block: verdict.blockNumber.toString(),
+        status,
       }),
     );
-
-    c.header("X-Payment-Method", "tx_hash");
-    c.header("X-Payment-Tx", txHash.toLowerCase());
-    return next();
   };
 }

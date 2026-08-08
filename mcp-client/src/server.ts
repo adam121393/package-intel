@@ -210,13 +210,21 @@ mcp.registerTool(
 
 const txHashMode = process.env.X402_TX_HASH === "true";
 
+// Optional in the schema because a wallet-configured install does not need it,
+// but the description has to be blunt: in tx_hash mode there is no wallet to
+// fall back on, so omitting it can only produce a 402.
 const txHashSchema = z
   .string()
   .optional()
   .describe(
-    "Hash of a confirmed USDC payment on Base for this call's price, if paying manually " +
-      "rather than with a configured wallet. Each hash is accepted once and must be used " +
-      "within 15 minutes of confirming. A 402 response states the amount and address.",
+    paidMode
+      ? "Optional. Hash of a confirmed USDC payment on Base for this call's price, if you " +
+        "settled it yourself instead of letting the configured wallet pay. Accepted once, " +
+        "within 15 minutes of confirming."
+      : "REQUIRED in this configuration: no wallet is configured, so the call is only served " +
+        "when this is the hash of a confirmed USDC payment on Base for the call's price. " +
+        "Accepted once, within 15 minutes of confirming. Call without it to get a 402 " +
+        "stating the exact amount and address to pay.",
   );
 
 if (paidMode || txHashMode) {
