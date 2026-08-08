@@ -1,9 +1,10 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.adam121393/package-intel",
-  "description": "Free, zero-config npm, PyPI and crates.io package intelligence for coding agents: vulnerabilities (OSV), dependency graphs (deps.dev), download trends, and metadata. Check whether a dependency is safe, maintained, and current before adding it. No wallet or API key needed; consolidated health scores are paid per call in USDC, settled by x402 or by a transaction hash.",
-  "status": "active",
+  "title": "Package Intel",
+  "description": "npm, PyPI & crates.io health, vulns and dependency graphs. Runs locally, no API key.",
   "version": "1.1.0",
+  "websiteUrl": "https://github.com/adam121393/package-intel",
   "repository": {
     "url": "https://github.com/adam121393/package-intel",
     "source": "github"
@@ -19,7 +20,7 @@
       "environmentVariables": [
         {
           "name": "API_URL",
-          "description": "Base URL of the paid API.",
+          "description": "Base URL of the backing API.",
           "default": "https://marketagent.adam121393.workers.dev",
           "isRequired": false
         },
