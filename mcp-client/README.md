@@ -1,11 +1,12 @@
 # package-intel-mcp
 
 Package and dependency intelligence for AI coding agents. Lets an agent check
-whether an npm or PyPI package is maintained, popular, vulnerable, or deprecated
+whether an npm, PyPI or crates.io (Rust) package is maintained, popular, vulnerable,
+or deprecated
 **before** it writes the dependency into your project.
 
 Free, no account, no API key, no wallet. Data comes from the npm registry,
-PyPI, [OSV.dev](https://osv.dev) and [deps.dev](https://deps.dev), consolidated
+PyPI, crates.io, [OSV.dev](https://osv.dev) and [deps.dev](https://deps.dev), consolidated
 into one call so the agent doesn't have to stitch four APIs together.
 
 ## Install
@@ -38,6 +39,9 @@ That's the whole setup. No environment variables are required.
 | `package_deps` | Direct and transitive dependency graph, deprecated deps flagged |
 | `package_downloads` | Download counts over a time range |
 
+All three ecosystems use the same tools: pass `ecosystem` as `npm`, `pypi`, or
+`crates`.
+
 All four are free and read-only. Nothing about your code is transmitted — only
 the package name you ask about.
 
@@ -49,7 +53,7 @@ repo's `AGENTS.md` (or `CLAUDE.md`, or `.cursor/rules`) does:
 ```markdown
 ## Dependencies
 
-Before adding or upgrading any npm or PyPI dependency, call `package_vulns`
+Before adding or upgrading any npm, PyPI or Cargo dependency, call `package_vulns`
 and `package_snapshot` for it. Do not add a package that is deprecated, has
 an unfixed critical advisory, or has not been published in over two years —
 suggest a maintained alternative instead.
@@ -88,13 +92,28 @@ Two extra tools appear: `package_health` ($0.01/call) and
 > **This is a hot key that spends automatically.** Use a dedicated wallet with a
 > small balance, never your main one.
 
+### Paying without a hot key
+
+If your agent settles its own on-chain payments, you can skip the private key
+entirely. Set `X402_TX_HASH=true` to expose the paid tools, send the call's
+price in USDC on Base yourself, and pass the resulting transaction hash as the
+`tx_hash` argument. A `402` response tells you the exact amount and address.
+
+Each hash is accepted **once** and must be used within 15 minutes of confirming.
+
+> A transaction hash is public from the moment it confirms — which is also the
+> moment it becomes usable here — so anyone watching Base could present yours
+> first and consume the call. The exposure is one call's price, but prefer the
+> x402 path, which is not subject to this and is gasless for you besides.
+
 ## Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `API_URL` | `https://marketagent.adam121393.workers.dev` | Backing API |
 | `NETWORK` | `eip155:8453` (Base mainnet) | CAIP-2 network for payments |
-| `X402_PRIVATE_KEY` | *(unset)* | Enables the paid tools |
+| `X402_PRIVATE_KEY` | *(unset)* | Enables the paid tools, paying automatically |
+| `X402_TX_HASH` | `false` | Exposes the paid tools without a wallet, paying by `tx_hash` |
 
 ## Rate limits
 
@@ -104,6 +123,6 @@ rather than a stack trace. Paid endpoints are not rate limited.
 
 ## Attribution
 
-Data from the npm registry, PyPI, [OSV.dev](https://osv.dev) (Google/OpenSSF)
+Data from the npm registry, PyPI, crates.io, [OSV.dev](https://osv.dev) (Google/OpenSSF)
 and [deps.dev](https://deps.dev) (Google Open Source Insights). This tool
 consolidates and scores; it does not originate vulnerability data.

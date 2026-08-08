@@ -200,22 +200,40 @@ mcp.registerTool(
 );
 
 // ---------------------------------------------------------------------------
-// Paid tools — registered only when a funded wallet is configured, so an agent
-// without one never sees a tool it is guaranteed to fail at.
+// Paid tools.
+//
+// Registered when a wallet is configured, or when the operator opts in to
+// paying by transaction hash (X402_TX_HASH=true) — an agent that settles its
+// own USDC transfers has no private key here but can still pay. Without either,
+// these stay hidden rather than being offered as tools guaranteed to fail.
 // ---------------------------------------------------------------------------
 
-if (paidMode) {
+const txHashMode = process.env.X402_TX_HASH === "true";
+
+const txHashSchema = z
+  .string()
+  .optional()
+  .describe(
+    "Hash of a confirmed USDC payment on Base for this call's price, if paying manually " +
+      "rather than with a configured wallet. Each hash is accepted once and must be used " +
+      "within 15 minutes of confirming. A 402 response states the amount and address.",
+  );
+
+if (paidMode || txHashMode) {
   mcp.registerTool(
     "package_health",
     {
       description:
         "Get a 0-100 health/risk score for an npm, PyPI or crates.io (Rust) package, with maintenance, popularity, security, and freshness sub-scores plus a rationale. Use this to decide whether a dependency is safe to adopt. Costs $0.01 in USDC per call.",
-      inputSchema: { ecosystem: ecosystemSchema, name: nameSchema },
+      inputSchema: { ecosystem: ecosystemSchema, name: nameSchema, tx_hash: txHashSchema },
       annotations: readOnly,
     },
-    async ({ ecosystem, name }) => {
-      const path = `/v1/health/${ecosystem}/${encodeURIComponent(name)}`;
-      return callApi(path, () => api.get(path));
+    async ({ ecosystem, name, tx_hash }) => {
+      const query = tx_hash ? `?tx_hash=${encodeURIComponent(tx_hash)}` : "";
+      const path = `/v1/health/${ecosystem}/${encodeURIComponent(name)}${query}`;
+      // A caller supplying a hash has already paid, so the plain client is used
+      // — routing it through the paying client could settle a second payment.
+      return callApi(path, () => (tx_hash ? plainApi : api).get(path));
     },
   );
 
@@ -223,25 +241,30 @@ if (paidMode) {
     "package_batch_health",
     {
       description:
-        "Score up to 50 packages in one call — use this to audit an entire package.json or requirements.txt at once instead of calling package_health repeatedly. Costs $0.02 in USDC per call.",
+        "Score up to 50 packages in one call — use this to audit an entire package.json, requirements.txt or Cargo.toml at once instead of calling package_health repeatedly. Costs $0.02 in USDC per call.",
       inputSchema: {
         queries: z
           .array(z.object({ ecosystem: ecosystemSchema, name: nameSchema }))
           .min(1)
           .max(50)
           .describe("Packages to score, max 50"),
+        tx_hash: txHashSchema,
       },
       annotations: readOnly,
     },
-    async ({ queries }) => callApi("/v1/batch", () => api.post("/v1/batch", { queries })),
+    async ({ queries, tx_hash }) =>
+      callApi("/v1/batch", () =>
+        (tx_hash ? plainApi : api).post("/v1/batch", { queries, ...(tx_hash ? { tx_hash } : {}) }),
+      ),
   );
 }
 
 const transport = new StdioServerTransport();
 await mcp.connect(transport);
 // stderr only: stdout is the MCP protocol channel and must not be polluted.
-console.error(
-  paid
-    ? `package-intel MCP server ready (api=${baseURL}, 6 tools, payer=${paid.address})`
-    : `package-intel MCP server ready (api=${baseURL}, 4 free tools, no wallet configured)`,
-);
+const mode = paid
+  ? `6 tools, payer=${paid.address}`
+  : txHashMode
+    ? "6 tools, paying by tx_hash (no wallet configured)"
+    : "4 free tools, no wallet configured";
+console.error(`package-intel MCP server ready (api=${baseURL}, ${mode})`);
