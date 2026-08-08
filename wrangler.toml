@@ -12,7 +12,7 @@ compatibility_date = "2026-01-01"
 # The Worker exists purely to give a stable public hostname in front of a quick
 # tunnel, whose hostname changes on every restart.
 [vars]
-ORIGIN = "https://walked-neutral-appraisal-psychology.trycloudflare.com"
+ORIGIN = "https://paste-full-harper-stack.trycloudflare.com"
 
 [observability]
 enabled = true
