@@ -23,5 +23,14 @@ cdp_api_key.json
 *secret*.txt
 .dev.vars
 
-# Internal planning/strategy doc — kept local, not published
+# Internal planning/strategy docs — kept local, not published. These hold the
+# competitive analysis, earnings projections and tax notes; a stray `git add -A`
+# would otherwise publish them. The case variants matter: the pattern only
+# matched on this machine because core.ignorecase is true on Windows.
 Claude.md
+CLAUDE.md
+compass_artifact_*.md
+
+# Obsidian scratch notes that live in this folder
+Untitled.*
+[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].md
