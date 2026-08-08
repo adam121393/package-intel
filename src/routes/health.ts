@@ -1,8 +1,7 @@
 import type { Hono } from "hono";
 import { computeHealthScore } from "../domain/health.js";
-import { getNpmDownloads, getNpmSnapshot } from "../sources/npmRegistry.js";
 import { getVulnerabilities } from "../sources/osv.js";
-import { getPypiDownloads, getPypiSnapshot } from "../sources/pypi.js";
+import { getDownloads, getSnapshot, REGISTRY_ATTRIBUTION } from "../sources/registry.js";
 import { parseEcosystem, withUpstreamErrors } from "./helpers.js";
 
 export function registerHealthRoute(app: Hono) {
@@ -14,16 +13,23 @@ export function registerHealthRoute(app: Hono) {
       // Snapshot must resolve first so vulns can be scoped to the actual
       // latest version — querying OSV without a version returns every
       // advisory ever filed against the package across all history.
-      const snapshot = ecosystem === "npm" ? await getNpmSnapshot(name) : await getPypiSnapshot(name);
+      const snapshot = await getSnapshot[ecosystem](name);
       const [downloads, vulnReport] = await Promise.all([
-        (ecosystem === "npm" ? getNpmDownloads(name) : getPypiDownloads(name)).catch(() => null),
+        getDownloads[ecosystem](name).catch(() => null),
         getVulnerabilities(ecosystem, name, snapshot.version),
       ]);
 
+      // Only take the downloads figure when it is genuinely weekly. For crates
+      // the snapshot's estimate is the weekly-comparable number; the downloads
+      // endpoint reports a 90-day total, which would inflate popularity.
+      const weeklyDownloads = snapshot.weeklyDownloadsIsEstimate
+        ? snapshot.weeklyDownloads
+        : (downloads?.downloads ?? null);
+
       const health = computeHealthScore(
-        { ...snapshot, weeklyDownloads: downloads?.downloads ?? null },
+        { ...snapshot, weeklyDownloads },
         vulnReport.vulns,
-        [ecosystem === "npm" ? "npm registry" : "PyPI", "OSV.dev"],
+        [REGISTRY_ATTRIBUTION[ecosystem], "OSV.dev"],
       );
 
       return c.json({ ...health, cachedAt: new Date().toISOString() });

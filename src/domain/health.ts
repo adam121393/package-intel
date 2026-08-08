@@ -92,6 +92,9 @@ export function computeHealthScore(
     subscores,
     signals: {
       weeklyDownloads: snapshot.weeklyDownloads,
+      // Propagated so a caller can tell a reported weekly count from a rate
+      // derived off a longer window (crates.io publishes no weekly figure).
+      ...(snapshot.weeklyDownloadsIsEstimate ? { weeklyDownloadsIsEstimate: true } : {}),
       lastPublish: snapshot.lastPublish,
       openVulnerabilities: vulns.length,
       deprecated: snapshot.deprecated,

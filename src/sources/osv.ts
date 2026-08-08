@@ -3,7 +3,10 @@ import type { Ecosystem, VulnReport } from "../types.js";
 
 const VULN_TTL = 1000 * 60 * 60; // 1h
 
-const OSV_ECOSYSTEM: Record<Ecosystem, string> = { npm: "npm", pypi: "PyPI" };
+// OSV's own ecosystem spellings, which are not our public identifiers.
+// Verified against api.osv.dev: a "crates.io" query for openssl@0.10.55 returns
+// real advisories, so this string is confirmed rather than inferred.
+const OSV_ECOSYSTEM: Record<Ecosystem, string> = { npm: "npm", pypi: "PyPI", crates: "crates.io" };
 
 interface OsvVuln {
   id: string;

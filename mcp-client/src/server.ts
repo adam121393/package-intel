@@ -73,8 +73,13 @@ function attachUpgradeHint(data: unknown): unknown {
   return { ...data, _upgrade: UPGRADE_HINT };
 }
 
-const ecosystemSchema = z.enum(["npm", "pypi"]).describe("Package ecosystem: 'npm' or 'pypi'");
-const nameSchema = z.string().min(1).describe("Package name, e.g. 'express' or 'requests'");
+const ecosystemSchema = z
+  .enum(["npm", "pypi", "crates"])
+  .describe("Package ecosystem: 'npm', 'pypi', or 'crates' (crates.io / Cargo, for Rust)");
+const nameSchema = z
+  .string()
+  .min(1)
+  .describe("Package name, e.g. 'express', 'requests', or 'serde'");
 
 /** Turns upstream/axios failures into readable tool errors instead of stack traces. */
 async function callApi(
@@ -124,7 +129,7 @@ mcp.registerTool(
   "package_snapshot",
   {
     description:
-      "Get a consolidated snapshot of an npm or PyPI package: latest version, license, description, repository, weekly downloads, maintainers, last publish date, and deprecation status. Free, no payment required.",
+      "Get a consolidated snapshot of an npm, PyPI or crates.io (Rust) package: latest version, license, description, repository, weekly downloads, maintainers, last publish date, and deprecation status. Free, no payment required.",
     inputSchema: { ecosystem: ecosystemSchema, name: nameSchema },
     annotations: readOnly,
   },
@@ -138,7 +143,7 @@ mcp.registerTool(
   "package_vulns",
   {
     description:
-      "List known vulnerabilities (OSV.dev) for an npm or PyPI package. Pass a version to scope results to that version; omit it to see every advisory ever filed against the package. Free, no payment required.",
+      "List known vulnerabilities (OSV.dev) for an npm, PyPI or crates.io (Rust) package. Pass a version to scope results to that version; omit it to see every advisory ever filed against the package. Free, no payment required.",
     inputSchema: {
       ecosystem: ecosystemSchema,
       name: nameSchema,
@@ -157,7 +162,7 @@ mcp.registerTool(
   "package_deps",
   {
     description:
-      "Get the dependency graph for an npm or PyPI package: direct and transitive dependencies with versions and counts, with deprecated direct dependencies flagged. Free, no payment required.",
+      "Get the dependency graph for an npm, PyPI or crates.io (Rust) package: direct and transitive dependencies with versions and counts, with deprecated direct dependencies flagged. Free, no payment required.",
     inputSchema: {
       ecosystem: ecosystemSchema,
       name: nameSchema,
@@ -176,14 +181,14 @@ mcp.registerTool(
   "package_downloads",
   {
     description:
-      "Get download counts for an npm or PyPI package over a time range. Free, no payment required.",
+      "Get download counts for an npm, PyPI or crates.io (Rust) package over a time range. Free, no payment required.",
     inputSchema: {
       ecosystem: ecosystemSchema,
       name: nameSchema,
       range: z
         .enum(["last-day", "last-week", "last-month", "last-year"])
         .optional()
-        .describe("npm only; PyPI always returns last-week"),
+        .describe("npm only; PyPI returns last-week, crates.io returns a 90-day total"),
     },
     annotations: readOnly,
   },
@@ -204,7 +209,7 @@ if (paidMode) {
     "package_health",
     {
       description:
-        "Get a 0-100 health/risk score for an npm or PyPI package, with maintenance, popularity, security, and freshness sub-scores plus a rationale. Use this to decide whether a dependency is safe to adopt. Costs $0.01 in USDC per call.",
+        "Get a 0-100 health/risk score for an npm, PyPI or crates.io (Rust) package, with maintenance, popularity, security, and freshness sub-scores plus a rationale. Use this to decide whether a dependency is safe to adopt. Costs $0.01 in USDC per call.",
       inputSchema: { ecosystem: ecosystemSchema, name: nameSchema },
       annotations: readOnly,
     },

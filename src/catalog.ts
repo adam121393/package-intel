@@ -8,6 +8,8 @@
  * breaks indexing or, worse, misprices calls.
  */
 
+import { ECOSYSTEMS } from "./sources/registry.js";
+
 interface BaseCatalogEntry {
   /** Route key in "METHOD /path" form, as the x402 middleware expects. */
   route: string;
@@ -59,7 +61,9 @@ export function isPaid(entry: CatalogEntry): entry is PaidCatalogEntry {
  */
 export const PATH_PARAMS_SCHEMA = {
   properties: {
-    ecosystem: { type: "string", enum: ["npm", "pypi"] },
+    // Derived from the dispatch record so the schema advertised to indexers
+    // cannot fall behind what the service actually serves.
+    ecosystem: { type: "string", enum: ECOSYSTEMS },
     name: { type: "string" },
   },
   required: ["ecosystem", "name"],
@@ -88,7 +92,7 @@ export const CATALOG: CatalogEntry[] = [
     route: "GET /v1/package/:ecosystem/:name",
     tier: "free",
     description:
-      "Consolidated npm/PyPI package snapshot: latest version, license, description, repository, weekly downloads, maintainer count, last publish date, deprecation status.",
+      "Consolidated npm / PyPI / crates.io package snapshot: latest version, license, description, repository, weekly downloads, maintainer count, last publish date, deprecation status.",
     pathParams: { ecosystem: "npm", name: "express" },
     outputExample: {
       ecosystem: "npm",
@@ -108,7 +112,7 @@ export const CATALOG: CatalogEntry[] = [
     tier: "paid",
     price: "$0.01",
     description:
-      "Package health & risk score (0-100) for an npm or PyPI package, with maintenance/popularity/security/freshness sub-scores and a human-readable rationale. Vulnerabilities are scoped to the current version.",
+      "Package health & risk score (0-100) for an npm, PyPI or crates.io (Rust) package, with maintenance/popularity/security/freshness sub-scores and a human-readable rationale. Vulnerabilities are scoped to the current version.",
     pathParams: { ecosystem: "npm", name: "express" },
     outputExample: HEALTH_EXAMPLE,
   },
@@ -116,7 +120,7 @@ export const CATALOG: CatalogEntry[] = [
     route: "GET /v1/vulns/:ecosystem/:name",
     tier: "free",
     description:
-      "Known vulnerabilities from OSV.dev for an npm or PyPI package. Pass ?version= to scope results to a specific version; omit it for all advisories ever filed against the package.",
+      "Known vulnerabilities from OSV.dev for an npm, PyPI or crates.io (Rust) package. Pass ?version= to scope results to a specific version; omit it for all advisories ever filed against the package.",
     pathParams: { ecosystem: "npm", name: "express" },
     queryParams: { version: "5.2.1" },
     outputExample: {
@@ -131,7 +135,7 @@ export const CATALOG: CatalogEntry[] = [
     route: "GET /v1/deps/:ecosystem/:name",
     tier: "free",
     description:
-      "Dependency graph from deps.dev for an npm or PyPI package: direct and transitive dependencies with versions, counts, and deprecated direct dependencies flagged.",
+      "Dependency graph from deps.dev for an npm, PyPI or crates.io (Rust) package: direct and transitive dependencies with versions, counts, and deprecated direct dependencies flagged.",
     pathParams: { ecosystem: "npm", name: "express" },
     queryParams: { version: "5.2.1" },
     outputExample: {
@@ -149,7 +153,7 @@ export const CATALOG: CatalogEntry[] = [
     route: "GET /v1/downloads/:ecosystem/:name",
     tier: "free",
     description:
-      "Download counts for an npm or PyPI package. npm supports ?range=last-day|last-week|last-month|last-year; PyPI returns last-week.",
+      "Download counts for an npm, PyPI or crates.io (Rust) package. npm supports ?range=last-day|last-week|last-month|last-year; PyPI returns last-week; crates.io returns a 90-day total.",
     pathParams: { ecosystem: "npm", name: "express" },
     queryParams: { range: "last-week" },
     outputExample: {
@@ -166,12 +170,13 @@ export const CATALOG: CatalogEntry[] = [
     tier: "paid",
     price: "$0.02",
     description:
-      "Batched health scores for up to 50 npm/PyPI packages in one call — designed for scoring an entire dependency manifest (package.json / requirements.txt) at once.",
+      "Batched health scores for up to 50 npm / PyPI / crates.io packages in one call — designed for scoring an entire dependency manifest (package.json / requirements.txt / Cargo.toml) at once.",
     bodyType: "json",
     body: {
       queries: [
         { ecosystem: "npm", name: "express" },
         { ecosystem: "pypi", name: "requests" },
+        { ecosystem: "crates", name: "serde" },
       ],
     },
     outputExample: { results: [{ ...HEALTH_EXAMPLE, found: true }] },
@@ -199,6 +204,9 @@ export function freeRouteSegments(): Set<string> {
 export const SERVICE_TAGS = [
   "npm",
   "pypi",
+  "crates",
+  "cargo",
+  "rust",
   "dependencies",
   "package-health",
   "security",

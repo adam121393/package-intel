@@ -4,7 +4,9 @@ import type { DependencyGraph, DependencyNode, Ecosystem } from "../types.js";
 const DEPS_TTL = 1000 * 60 * 60 * 24; // 24h
 const DEPRECATION_CHECK_CONCURRENCY = 8;
 
-const DEPSDEV_SYSTEM: Record<Ecosystem, string> = { npm: "npm", pypi: "pypi" };
+// deps.dev calls the Rust ecosystem "cargo", not "crates" or "crates.io".
+// Verified: /v3/systems/cargo/packages/serde resolves, as does its :dependencies.
+const DEPSDEV_SYSTEM: Record<Ecosystem, string> = { npm: "npm", pypi: "pypi", crates: "cargo" };
 
 interface DepsDevGraph {
   nodes: {

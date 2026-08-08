@@ -12,6 +12,7 @@ import { registerDepsRoute } from "./routes/deps.js";
 import { registerDiscoveryRoutes } from "./routes/discovery.js";
 import { registerDownloadsRoute } from "./routes/downloads.js";
 import { registerHealthRoute } from "./routes/health.js";
+import { ecosystemList, parseEcosystem } from "./routes/helpers.js";
 import { registerPackageRoute } from "./routes/package.js";
 import { registerVulnsRoute } from "./routes/vulns.js";
 
@@ -34,9 +35,15 @@ export function createApp(): Hono {
     const segments = c.req.path.split("/").filter(Boolean);
     const isPathParamRoute = segments.length >= 3 && segments[0] === "v1";
     if (isPathParamRoute && segments[1] !== "batch" && segments[1] !== "sample") {
-      const ecosystem = segments[2];
-      if (ecosystem !== "npm" && ecosystem !== "pypi") {
-        return c.json({ error: `Unsupported ecosystem '${ecosystem}'. Must be 'npm' or 'pypi'.` }, 400);
+      const ecosystem = segments[2] ?? "";
+      // Uses parseEcosystem rather than its own literal list: this check and the
+      // handlers must never disagree about what is supported, or a newly added
+      // ecosystem 400s here before reaching a handler that would have served it.
+      if (!parseEcosystem(ecosystem)) {
+        return c.json(
+          { error: `Unsupported ecosystem '${ecosystem}'. Must be ${ecosystemList()}.` },
+          400,
+        );
       }
     }
     await next();

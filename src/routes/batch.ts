@@ -2,12 +2,20 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import { UpstreamNotFoundError } from "../cache.js";
 import { computeHealthScore } from "../domain/health.js";
-import { getNpmDownloads, getNpmSnapshot } from "../sources/npmRegistry.js";
 import { getVulnerabilities } from "../sources/osv.js";
-import { getPypiDownloads, getPypiSnapshot } from "../sources/pypi.js";
+import {
+  ECOSYSTEMS,
+  getDownloads,
+  getSnapshot,
+  REGISTRY_ATTRIBUTION,
+} from "../sources/registry.js";
+import type { Ecosystem } from "../types.js";
 
+// Built from ECOSYSTEMS rather than repeating the literals: a zod enum is not
+// derived from the Ecosystem type, so a hand-written list here would silently
+// keep rejecting an ecosystem the rest of the service already supports.
 const BatchQuerySchema = z.object({
-  ecosystem: z.enum(["npm", "pypi"]),
+  ecosystem: z.enum(ECOSYSTEMS as [Ecosystem, ...Ecosystem[]]),
   name: z.string().min(1).max(214),
 });
 
@@ -36,15 +44,20 @@ export function registerBatchRoute(app: Hono) {
     const results = await Promise.all(
       parsed.data.queries.map(async ({ ecosystem, name }) => {
         try {
-          const snapshot = ecosystem === "npm" ? await getNpmSnapshot(name) : await getPypiSnapshot(name);
+          const snapshot = await getSnapshot[ecosystem](name);
           const [downloads, vulnReport] = await Promise.all([
-            (ecosystem === "npm" ? getNpmDownloads(name) : getPypiDownloads(name)).catch(() => null),
+            getDownloads[ecosystem](name).catch(() => null),
             getVulnerabilities(ecosystem, name, snapshot.version),
           ]);
+          // See health.ts: only a genuinely weekly figure may replace the
+          // snapshot's own, or crates' 90-day total would skew popularity.
+          const weeklyDownloads = snapshot.weeklyDownloadsIsEstimate
+            ? snapshot.weeklyDownloads
+            : (downloads?.downloads ?? null);
           const health = computeHealthScore(
-            { ...snapshot, weeklyDownloads: downloads?.downloads ?? null },
+            { ...snapshot, weeklyDownloads },
             vulnReport.vulns,
-            [ecosystem === "npm" ? "npm registry" : "PyPI", "OSV.dev"],
+            [REGISTRY_ATTRIBUTION[ecosystem], "OSV.dev"],
           );
           return { ...health, found: true };
         } catch (err) {

@@ -1,4 +1,11 @@
-export type Ecosystem = "npm" | "pypi";
+/**
+ * Public ecosystem identifiers, used as the `:ecosystem` path segment. These are
+ * our own names, deliberately dot-free and lowercase; each upstream spells them
+ * differently ("crates" is "crates.io" to OSV and "cargo" to deps.dev), and those
+ * mappings live in exhaustive Records next to the source that needs them, so
+ * adding a member here fails the build until every mapping is filled in.
+ */
+export type Ecosystem = "npm" | "pypi" | "crates";
 
 export interface PackageSnapshot {
   ecosystem: Ecosystem;
@@ -8,6 +15,15 @@ export interface PackageSnapshot {
   description: string | null;
   repository: string | null;
   weeklyDownloads: number | null;
+  /**
+   * True when `weeklyDownloads` was derived rather than reported. crates.io
+   * publishes only all-time and ~90-day totals, so a weekly figure for a crate
+   * is a rate estimate. The health scorer's popularity curve is calibrated on
+   * weekly counts, so feeding it a 90-day total would inflate every crate;
+   * normalising keeps ecosystems comparable, and this flag keeps that honest
+   * to the caller instead of silently relabelling a 90-day number as weekly.
+   */
+  weeklyDownloadsIsEstimate?: boolean;
   lastPublish: string | null;
   maintainerCount: number | null;
   deprecated: boolean;
@@ -70,6 +86,8 @@ export interface HealthScore {
   };
   signals: {
     weeklyDownloads: number | null;
+    /** See PackageSnapshot.weeklyDownloadsIsEstimate. */
+    weeklyDownloadsIsEstimate?: boolean;
     lastPublish: string | null;
     openVulnerabilities: number;
     deprecated: boolean;

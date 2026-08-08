@@ -185,7 +185,7 @@ export function registerDiscoveryRoutes(app: Hono) {
       x402Version: 2,
       name: config.serviceName,
       description:
-        "Package & dependency intelligence for AI coding agents: health/risk scores, dependency graphs, and vulnerability lookups for npm and PyPI packages.",
+        "Package & dependency intelligence for AI coding agents: health/risk scores, dependency graphs, and vulnerability lookups for npm, PyPI and crates.io (Rust) packages.",
       tags: SERVICE_TAGS,
       resources: CATALOG.map((entry) => {
         const [method, path] = entry.route.split(" ") as [string, string];
