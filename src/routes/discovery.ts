@@ -187,6 +187,33 @@ export function registerDiscoveryRoutes(app: Hono) {
       description:
         "Package & dependency intelligence for AI coding agents: health/risk scores, dependency graphs, and vulnerability lookups for npm, PyPI and crates.io (Rust) packages.",
       tags: SERVICE_TAGS,
+      // Advertised here as well as in the 402 headers, because an agent that
+      // cannot speak x402 needs to learn the alternative exists *before* it
+      // gives up on a 402 it does not know how to satisfy.
+      ...(config.txPaymentEnabled
+        ? {
+            paymentMethods: [
+              {
+                method: "x402",
+                preferred: true,
+                description:
+                  "PAYMENT-SIGNATURE header, settled by the facilitator. Gasless for the buyer, no confirmation wait.",
+              },
+              {
+                method: "tx_hash",
+                preferred: false,
+                description:
+                  "Send the endpoint's price in USDC yourself, then retry the request with ?tx_hash=<hash> (or \"tx_hash\" in a JSON body). Each hash is accepted once.",
+                asset: config.usdcAddress,
+                payTo: config.payTo,
+                network: config.network,
+                mustBeUsedWithinSeconds: config.txMaxAgeSeconds,
+                warning:
+                  "A transaction hash is public once confirmed and the first caller to present it consumes it. Prefer x402.",
+              },
+            ],
+          }
+        : {}),
       resources: CATALOG.map((entry) => {
         const [method, path] = entry.route.split(" ") as [string, string];
         return {

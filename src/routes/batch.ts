@@ -21,6 +21,10 @@ const BatchQuerySchema = z.object({
 
 const BatchBodySchema = z.object({
   queries: z.array(BatchQuerySchema).min(1).max(50),
+  // Consumed by the payment gate before this handler runs. Declared so it is a
+  // documented part of the request rather than an unknown key, and so a future
+  // switch to a strict schema would not start rejecting paying callers.
+  tx_hash: z.string().optional(),
 });
 
 export function registerBatchRoute(app: Hono) {

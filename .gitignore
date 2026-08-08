@@ -40,3 +40,6 @@ Untitled.*
 
 # npm auth — never commit
 .npmrc
+
+# Spent transaction-hash ledger (payment state, machine-local)
+.used-tx.log

@@ -24,7 +24,35 @@ export interface AppConfig {
    * trivially bypassed by forging that header — see src/rateLimit.ts.
    */
   proxySecret?: string;
+  /**
+   * Accept a confirmed on-chain USDC transfer, referenced by transaction hash,
+   * as an alternative to an x402 signature. For agents that cannot speak x402's
+   * header protocol. See src/payment/txGate.ts.
+   */
+  txPaymentEnabled: boolean;
+  /** JSON-RPC endpoint used to verify those transfers. */
+  rpcUrl: string;
+  /** ERC-20 the transfer must be denominated in. */
+  usdcAddress: string;
+  /**
+   * How long after confirmation a transaction may still be redeemed. Bounds
+   * both the replay window and how much the used-hash ledger must remember.
+   */
+  txMaxAgeSeconds: number;
+  /** Append-only ledger of spent hashes; undefined keeps it in memory only. */
+  usedTxLedgerPath?: string;
 }
+
+/** Circulating USDC, per network. */
+const USDC_ADDRESS: Record<string, string> = {
+  "eip155:8453": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // Base mainnet
+  "eip155:84532": "0x036CbD53842c5426634e7929541eC2318f3dCF7e", // Base Sepolia
+};
+
+const DEFAULT_RPC: Record<string, string> = {
+  "eip155:8453": "https://mainnet.base.org",
+  "eip155:84532": "https://sepolia.base.org",
+};
 
 /**
  * Loads a local .env file when running under Node. Cloudflare Workers has no
@@ -95,6 +123,12 @@ export function getConfig(): AppConfig {
     bazaarEnabled: process.env.BAZAAR_ENABLED !== "false",
     syncFacilitator: process.env.SYNC_FACILITATOR !== "false",
     proxySecret: process.env.PROXY_SECRET,
+    txPaymentEnabled: process.env.TX_PAYMENT_ENABLED !== "false",
+    rpcUrl: process.env.BASE_RPC_URL ?? DEFAULT_RPC[network] ?? DEFAULT_RPC[BASE_MAINNET]!,
+    usdcAddress:
+      process.env.USDC_CONTRACT_ADDRESS ?? USDC_ADDRESS[network] ?? USDC_ADDRESS[BASE_MAINNET]!,
+    txMaxAgeSeconds: Number(process.env.TX_MAX_AGE_SECONDS ?? 900), // 15 minutes
+    usedTxLedgerPath: process.env.USED_TX_LEDGER_PATH ?? ".used-tx.log",
   };
 
   if (cached.isMainnet && !cached.proxySecret) {

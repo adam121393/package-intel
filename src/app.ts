@@ -6,6 +6,7 @@ import { paymentMiddleware, x402ResourceServer } from "@x402/hono";
 import { Hono } from "hono";
 import { freeRouteSegments, paidEntries, PATH_PARAMS_SCHEMA, SERVICE_TAGS } from "./catalog.js";
 import { getConfig } from "./config.js";
+import { createTxPaymentGate } from "./payment/txGate.js";
 import { RateLimiter, resolveRateLimitKey } from "./rateLimit.js";
 import { registerBatchRoute } from "./routes/batch.js";
 import { registerDepsRoute } from "./routes/deps.js";
@@ -121,7 +122,20 @@ export function createApp(): Hono {
 
   // syncFacilitatorOnStart (arg 5) is disabled on runtimes where a blocking
   // startup round-trip to the facilitator is undesirable.
-  app.use(paymentMiddleware(routes, resourceServer, undefined, undefined, config.syncFacilitator));
+  const x402Middleware = paymentMiddleware(
+    routes,
+    resourceServer,
+    undefined,
+    undefined,
+    config.syncFacilitator,
+  );
+
+  // The x402 middleware is nested inside the tx_hash gate rather than
+  // registered alongside it. Side by side, a request the gate had just verified
+  // on-chain would still reach x402 and be answered with a 402 — charged, then
+  // refused. The gate delegates to x402 for every request that is not paying by
+  // transaction hash, so that path is unchanged.
+  app.use(createTxPaymentGate(config, x402Middleware));
 
   registerPackageRoute(app);
   registerHealthRoute(app);
