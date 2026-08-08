@@ -43,3 +43,6 @@ Untitled.*
 
 # Spent transaction-hash ledger (payment state, machine-local)
 .used-tx.log
+
+# Local task/scratch notes dropped in this folder
+Task for *.md
