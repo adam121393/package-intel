@@ -1,6 +1,7 @@
 {
   "name": "package-intel-mcp",
   "version": "1.0.0",
+  "mcpName": "io.github.adam121393/package-intel",
   "description": "MCP server giving coding agents npm/PyPI package health, vulnerability, dependency-graph and download data. Free and zero-config; an optional wallet unlocks paid consolidated risk scores over x402.",
   "type": "module",
   "bin": {
