@@ -1,11 +1,11 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
-  "name": "io.github.optirefine/package-intel",
+  "name": "io.github.adam121393/package-intel",
   "description": "Health scores, dependency graphs, and vulnerability data for npm and PyPI packages. Lets a coding agent check whether a dependency is safe, maintained, and current before adding it. Pay-per-call in USDC over x402.",
   "status": "active",
   "version": "1.0.0",
   "repository": {
-    "url": "https://github.com/Optirefine/package-intel",
+    "url": "https://github.com/adam121393/package-intel",
     "source": "github"
   },
   "packages": [

@@ -147,9 +147,9 @@ URL / Base mainnet, since a published package pointing at localhost is useless.
 - Package README: one-line install, Claude Desktop / Cursor config, and a
   copy-paste `AGENTS.md` block, since agent instruction files are what produce
   recurring invocation.
-- `server.json` now names `io.github.optirefine/package-intel`. The repo is
+- `server.json` now names `io.github.adam121393/package-intel`. The repo is
   still local-only, so MCP Registry submission — which proves ownership through
-  GitHub — stays blocked until it is pushed to `Optirefine/package-intel`.
+  GitHub — stays blocked until it is pushed to `adam121393/package-intel`.
 
 Publishing is a separate, explicit step requiring the user's `npm login`. The
 name and version are permanent once released.
