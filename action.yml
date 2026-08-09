@@ -1,0 +1,40 @@
+name: "Package Intel dependency review"
+description: "Check newly added npm, PyPI and Cargo dependencies for advisories, deprecation and staleness on every pull request. Free, no API key."
+author: "adam121393"
+
+branding:
+  icon: "shield"
+  color: "blue"
+
+inputs:
+  fail-on:
+    description: >-
+      Fail the check when an added dependency has an advisory at or above this
+      severity: none, low, moderate, high, or critical. Defaults to none, so the
+      action reports without blocking until you decide to enforce it.
+    required: false
+    default: "none"
+  github-token:
+    description: >-
+      Token used to post the review comment. The default GITHUB_TOKEN is enough;
+      it needs pull-requests: write.
+    required: false
+    default: ${{ github.token }}
+  comment:
+    description: "Post (and update) a comment on the pull request. Set to false to log results only."
+    required: false
+    default: "true"
+  api-url:
+    description: "Backing API. Override only if you run your own instance."
+    required: false
+    default: "https://marketagent.adam121393.workers.dev"
+
+outputs:
+  checked:
+    description: "Number of newly added dependencies looked up."
+  flagged:
+    description: "How many of those had something worth attention."
+
+runs:
+  using: "node20"
+  main: "action/index.mjs"

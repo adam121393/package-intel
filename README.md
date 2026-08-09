@@ -136,6 +136,53 @@ Installing a tool does not make an agent reach for it. A line in the consuming r
 mechanism that produces recurring invocation, not registry listings. `mcp-client/README.md`
 ships a copy-paste block for this.
 
+## GitHub Action
+
+`action.yml` publishes this repository as a dependency-review action. On a pull request that
+touches `package.json`, `requirements*.txt` or `Cargo.toml`, it looks up every **newly added**
+dependency and comments with advisories, deprecation, staleness and missing licences.
+
+```yaml
+name: Dependency review
+on:
+  pull_request:
+    paths: ["**/package.json", "**/requirements*.txt", "**/Cargo.toml"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # needed: the action diffs base against head
+      - uses: adam121393/package-intel@v1
+        with:
+          fail-on: critical     # none | low | moderate | high | critical
+```
+
+Uses the free endpoints only — no wallet, no API key, no signup. Zero runtime dependencies, so
+adding it to a pipeline is not a supply-chain ask.
+
+| Input | Default | Purpose |
+|---|---|---|
+| `fail-on` | `none` | Fail the check at this severity or above |
+| `comment` | `true` | Post and update a PR comment |
+| `github-token` | `${{ github.token }}` | Needs `pull-requests: write` |
+| `api-url` | hosted service | Override to run against your own instance |
+
+Two behaviours worth knowing. Only **added** dependencies are reviewed, not version bumps of
+existing ones, so the comment does not become noise people learn to scroll past. And advisories
+are scoped to a version: an exact pin is checked as written, while a range is checked against the
+package's current release. That distinction matters — querying without a version returns every
+advisory ever filed, which reports a fully patched `lodash` as critical.
+
+A dependency that cannot be looked up is never a failure. An upstream outage must not block an
+unrelated pull request.
+
 ## Coinbase CDP setup
 
 Two **different** CDP credentials, easy to conflate:
