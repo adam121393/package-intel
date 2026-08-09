@@ -28,7 +28,24 @@ if (existsSync(".env")) process.loadEnvFile(".env");
 // at all still works. Point API_URL at localhost to develop against your own.
 const baseURL = process.env.API_URL ?? "https://marketagent.adam121393.workers.dev";
 const network = (process.env.NETWORK ?? "eip155:8453") as `${string}:${string}`;
-const privateKey = process.env.X402_PRIVATE_KEY ?? process.env.BUYER_PRIVATE_KEY;
+
+/**
+ * Only X402_PRIVATE_KEY arms the wallet.
+ *
+ * BUYER_PRIVATE_KEY used to be accepted as a fallback, which meant a variable
+ * left in a developer's .env for an unrelated purpose silently put a spending
+ * wallet behind the paid tools. Nothing named "x402" had to be set for real
+ * money to become spendable. It is now ignored, but noisily, so anyone relying
+ * on the old name finds out immediately rather than wondering where the paid
+ * tools went.
+ */
+const privateKey = process.env.X402_PRIVATE_KEY;
+if (!privateKey && process.env.BUYER_PRIVATE_KEY) {
+  console.error(
+    "BUYER_PRIVATE_KEY is set but is no longer used — rename it to X402_PRIVATE_KEY to enable the paid tools.\n" +
+      "Running in free mode.",
+  );
+}
 
 const plainApi = axios.create({ baseURL, timeout: 60_000 });
 
@@ -83,17 +100,69 @@ const nameSchema = z
   .min(1)
   .describe("Package name, e.g. 'express', 'requests', or 'serde'");
 
+/**
+ * Explains a 402 in words, from the challenge the server put in the header.
+ *
+ * x402 v2 carries the payment requirements in PAYMENT-REQUIRED and leaves the
+ * body empty, so an unpaid call used to surface to the agent as `{}` — no
+ * error, no mention of payment, nothing to act on. That is what a customer with
+ * an unfunded wallet saw, and it reads as a broken tool rather than a wallet
+ * that needs topping up.
+ */
+function describePaymentRequired(headers: Record<string, unknown> | undefined, path: string): string {
+  const raw = headers?.["payment-required"] ?? headers?.["PAYMENT-REQUIRED"];
+  const lines = [`Payment required for ${path}.`];
+  try {
+    const decoded = JSON.parse(Buffer.from(String(raw ?? ""), "base64").toString("utf8"));
+    const accept = decoded?.accepts?.[0];
+    if (accept) {
+      const usd = Number(accept.amount) / 1e6;
+      lines.push(
+        `Price: $${usd.toFixed(usd < 0.01 ? 6 : 2)} USDC (${accept.amount} units) on ${accept.network}`,
+        `Pay to: ${accept.payTo}`,
+      );
+    }
+  } catch {
+    // Header missing or malformed — the advice below still applies.
+  }
+  lines.push(
+    paid
+      ? `Your configured wallet ${paid.address} could not complete the payment. The most likely cause is that it holds no USDC on ${network}.`
+      : "No wallet is configured. Set X402_PRIVATE_KEY to a wallet funded with USDC on Base to use the paid tools.",
+  );
+  return lines.join("\n");
+}
+
 /** Turns upstream/axios failures into readable tool errors instead of stack traces. */
 async function callApi(
   path: string,
-  request: () => Promise<{ data: unknown }>,
+  request: () => Promise<{ data: unknown; status?: number; headers?: Record<string, unknown> }>,
   options: { free?: boolean } = {},
 ) {
   try {
-    const { data } = await request();
-    const payload = options.free ? attachUpgradeHint(data) : data;
+    const res = await request();
+    // The payment wrapper resolves rather than throws when it cannot settle, so
+    // a 402 arrives here as a successful response with an empty body.
+    if (res.status === 402) {
+      return {
+        isError: true,
+        content: [{ type: "text" as const, text: describePaymentRequired(res.headers, path) }],
+      };
+    }
+    const payload = options.free ? attachUpgradeHint(res.data) : res.data;
     return { content: [{ type: "text" as const, text: JSON.stringify(payload, null, 2) }] };
   } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 402) {
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text" as const,
+            text: describePaymentRequired(err.response.headers as Record<string, unknown>, path),
+          },
+        ],
+      };
+    }
     if (axios.isAxiosError(err) && err.response?.status === 429) {
       const retryAfter = err.response.headers["retry-after"];
       return {
