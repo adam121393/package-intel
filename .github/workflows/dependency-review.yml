@@ -1,0 +1,34 @@
+# Runs this repository's own action against this repository's pull requests.
+#
+# Dogfooding, but also the only continuous test that the action still works
+# against the live API — the unit tests cover parsing and thresholds, and
+# nothing else would catch a breaking change to the endpoints it calls.
+name: Dependency review
+
+on:
+  pull_request:
+    paths:
+      - "**/package.json"
+      - "**/requirements*.txt"
+      - "**/Cargo.toml"
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The action diffs the base commit against the head, so it needs more
+          # than the single-commit checkout Actions does by default.
+          fetch-depth: 0
+
+      - uses: ./
+        with:
+          # Reporting only on our own PRs: this action is new, and blocking
+          # merges on it before it has been through a few real pull requests
+          # would be trusting it further than it has earned.
+          fail-on: none
