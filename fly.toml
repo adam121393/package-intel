@@ -1,0 +1,52 @@
+# Fly.io config for the x402 API service (the paid tier only).
+#
+# The free tier runs at the Cloudflare edge and is not deployed here, so an
+# outage of this app takes down the paid routes and nothing else — which is
+# what /healthz reports separately.
+#
+# Deploy with:  fly deploy
+# Secrets are set out of band and never committed:
+#   fly secrets set PAY_TO=0x... CDP_API_KEY_ID=... CDP_API_KEY_SECRET=... PROXY_SECRET=...
+
+app = "package-intel-api"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile.api"
+
+[env]
+  PORT = "4021"
+  NETWORK = "eip155:8453"
+  SERVICE_NAME = "Package & Dependency Intelligence"
+  # Absolute resource URLs in the discovery manifest must be the public hostname
+  # callers actually use, not this app's. Indexers cache what they are given.
+  PUBLIC_URL = "https://marketagent.adam121393.workers.dev"
+  USED_TX_LEDGER_PATH = "/data/used-tx.log"
+
+[http_service]
+  internal_port = 4021
+  force_https = true
+  # Not scaled to zero: a cold start inside the payment path risks a facilitator
+  # timeout, and the whole point of moving off the laptop is that the paid tier
+  # stops being intermittently unreachable.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    timeout = "10s"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+# Durable storage for the spent transaction-hash ledger. Without it a restart
+# forgets which hashes were spent, and a previously used payment could be
+# redeemed again.
+[mounts]
+  source = "package_intel_data"
+  destination = "/data"

@@ -1,0 +1,40 @@
+# Builds the x402 API service — the paid tier.
+#
+# Deliberately separate from ./Dockerfile, which builds the MCP server for
+# directory indexers. This repository ships two programs and they must not be
+# confused: pointing a host at the wrong one is what made every Glama build fail
+# with "Missing required environment variable: PAY_TO".
+#
+# Only the paid routes need to run here. The free tier is served at the
+# Cloudflare edge and does not depend on this container being up.
+
+FROM node:22-alpine AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+FROM node:22-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+# tsx is a devDependency and the service runs TypeScript directly, so the full
+# dependency tree is kept rather than pruned with --omit=dev.
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+COPY tsconfig.json ./
+COPY src ./src
+
+# The spent transaction-hash ledger lives here. On a host with an ephemeral
+# filesystem it is lost on restart, which costs single-use enforcement across
+# restarts but never allows a double-spend within one process lifetime; mount a
+# volume at /data to make it durable.
+ENV USED_TX_LEDGER_PATH=/data/used-tx.log
+RUN mkdir -p /data && chown node:node /data
+
+USER node
+EXPOSE 4021
+
+# Startup verifies configuration and fails loudly if a required secret is
+# missing, which is the behaviour we want from a host: a bad deploy should not
+# come up healthy.
+CMD ["npx", "tsx", "src/server.ts"]
