@@ -1,6 +1,7 @@
 import type { Hono } from "hono";
 import { type CallRecord, type D1Like, describeRequest, readStats, recordCall } from "./callLog.js";
 import { createFreeApp, isFreeRoute } from "./freeApp.js";
+import { renderLlmsTxt } from "./routes/llms.js";
 
 /**
  * Edge front door: serves the free tier itself, proxies the paid tier.
@@ -128,6 +129,18 @@ export default {
 
     if (url.pathname === "/stats") {
       return handleStats(request, env);
+    }
+
+    // Served at the edge, from the request's own origin, so the document stays
+    // available and self-consistent regardless of the paid origin's state.
+    if (url.pathname === "/llms.txt") {
+      return new Response(renderLlmsTxt(`${url.protocol}//${url.host}`), {
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=3600",
+          "X-Served-By": "edge",
+        },
+      });
     }
 
     // Free tier, served here. Never touches the origin, so it stays up when the
