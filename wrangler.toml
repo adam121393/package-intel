@@ -16,3 +16,11 @@ ORIGIN = "https://paste-full-harper-stack.trycloudflare.com"
 
 [observability]
 enabled = true
+
+# Call log. Every request that reaches the Worker is recorded here — free ones
+# served at the edge and paid ones on their way to the origin — so usage is
+# visible in one place rather than split between two runtimes.
+[[d1_databases]]
+binding = "DB"
+database_name = "package-intel-logs"
+database_id = "25e583ee-2285-4c8f-a1c8-c611025184c2"

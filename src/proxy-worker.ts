@@ -1,4 +1,5 @@
 import type { Hono } from "hono";
+import { type CallRecord, type D1Like, describeRequest, readStats, recordCall } from "./callLog.js";
 import { createFreeApp, isFreeRoute } from "./freeApp.js";
 
 /**
@@ -28,6 +29,19 @@ interface Env {
    * Set with: npx wrangler secret put PROXY_SECRET
    */
   PROXY_SECRET?: string;
+  /** Call log. Absent in local dev, in which case logging is skipped. */
+  DB?: D1Like;
+  /**
+   * Bearer token for /stats. Without it the route stays closed: the log records
+   * which packages callers ask about, which is nobody else's business.
+   * Set with: npx wrangler secret put STATS_TOKEN
+   */
+  STATS_TOKEN?: string;
+}
+
+/** Minimal shape of the Workers execution context we rely on. */
+interface Ctx {
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 /** Hop-by-hop and Cloudflare-injected headers that must not be forwarded upstream. */
@@ -55,9 +69,66 @@ const STRIP_REQUEST_HEADERS = new Set([
 // warm across requests instead of being discarded each time.
 let freeApp: Hono | undefined;
 
+/**
+ * Usage summary. Gated behind a bearer token: the log records which packages
+ * callers look up, and for anyone auditing a private codebase that list is
+ * sensitive. With no token configured the route stays shut rather than
+ * defaulting open.
+ */
+async function handleStats(request: Request, env: Env): Promise<Response> {
+  if (!env.STATS_TOKEN) {
+    return Response.json(
+      { error: "Stats are disabled: STATS_TOKEN is not configured." },
+      { status: 404 },
+    );
+  }
+  const provided = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  // Length check first so the comparison below is only ever on equal-length
+  // strings; not constant-time, but the token is high-entropy and this is a
+  // single-user admin route.
+  if (provided.length !== env.STATS_TOKEN.length || provided !== env.STATS_TOKEN) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!env.DB) {
+    return Response.json({ error: "No call log bound." }, { status: 503 });
+  }
+
+  const days = Number(new URL(request.url).searchParams.get("days") ?? 30);
+  try {
+    const stats = await readStats(env.DB, Number.isFinite(days) && days > 0 ? days : 30);
+    return Response.json(stats, { headers: { "cache-control": "no-store" } });
+  } catch (err) {
+    return Response.json(
+      { error: "Could not read stats", message: err instanceof Error ? err.message : String(err) },
+      { status: 500 },
+    );
+  }
+}
+
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx?: Ctx): Promise<Response> {
     const url = new URL(request.url);
+    const startedAt = Date.now();
+
+    /**
+     * Records the call after the response has been handed back. Passed to
+     * waitUntil so the D1 write never delays the client, and never fails the
+     * request if the table is unavailable.
+     */
+    const log = (partial: Omit<CallRecord, "route" | "ecosystem" | "packageName" | "durationMs">) => {
+      if (!env.DB) return;
+      const described = describeRequest(url.pathname);
+      const promise = recordCall(env.DB, {
+        ...described,
+        ...partial,
+        durationMs: Date.now() - startedAt,
+      });
+      if (ctx) ctx.waitUntil(promise);
+    };
+
+    if (url.pathname === "/stats") {
+      return handleStats(request, env);
+    }
 
     // Free tier, served here. Never touches the origin, so it stays up when the
     // origin PC does not.
@@ -70,6 +141,16 @@ export default {
       const response = await freeApp.fetch(request);
       const headers = new Headers(response.headers);
       headers.set("X-Served-By", "edge");
+
+      log({
+        tier: "free",
+        status: response.status,
+        servedBy: "edge",
+        country: request.headers.get("cf-ipcountry"),
+        userAgent: request.headers.get("user-agent"),
+        paid: false,
+      });
+
       return new Response(response.body, {
         status: response.status,
         statusText: response.statusText,
@@ -151,6 +232,19 @@ export default {
       const outHeaders = new Headers(upstream.headers);
       outHeaders.delete("transfer-encoding");
       outHeaders.delete("connection");
+
+      // A 402 is a paid route that was *not* paid for; only a 2xx means money
+      // actually changed hands. Counting 402s as revenue would make an
+      // unconverted endpoint look like a working one.
+      const isPaidRoute = url.pathname.startsWith("/v1/health/") || url.pathname === "/v1/batch";
+      log({
+        tier: isPaidRoute ? "paid" : "other",
+        status: upstream.status,
+        servedBy: "origin",
+        country: request.headers.get("cf-ipcountry"),
+        userAgent: request.headers.get("user-agent"),
+        paid: isPaidRoute && upstream.status >= 200 && upstream.status < 300,
+      });
 
       return new Response(upstream.body, {
         status: upstream.status,
