@@ -184,7 +184,7 @@ address before promoting the endpoint anywhere.
 
 ## Deploy (Railway)
 
-`railway.json` is included (Nixpacks, `npm start`, `/healthz` health check). Push the repo,
+`railway.json` is included (Nixpacks, `npm run start:api`, `/healthz` health check). Push the repo,
 create a Railway project from it, and set the environment variables from `.env.example` in
 Railway's variables UI — **not** in a committed file. Point uptime monitoring at `/healthz`.
 

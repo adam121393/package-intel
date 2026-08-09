@@ -6,15 +6,15 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "start": "tsx mcp-client/src/server.ts",
+    "start:api": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "gen-wallet": "tsx scripts/gen-wallet.ts",
     "test-buyer": "tsx scripts/test-buyer.ts",
     "set-origin": "tsx scripts/set-origin.ts",
     "cdp-check": "tsx scripts/cdp-check.ts",
-    "cdp-wallet": "tsx scripts/cdp-wallet.ts",
-    "mcp": "tsx mcp-client/src/server.ts"
+    "cdp-wallet": "tsx scripts/cdp-wallet.ts"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "^1.54.0",
