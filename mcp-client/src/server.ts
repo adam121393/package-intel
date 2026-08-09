@@ -1,4 +1,6 @@
-#!/usr/bin/env node
+// The shebang is emitted by build.mjs, not kept here: a banner cannot be
+// placed above one that already exists in the entry file without pushing it off
+// line 1, where it stops being a shebang.
 import { existsSync } from "node:fs";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";

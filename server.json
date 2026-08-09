@@ -3,7 +3,7 @@
   "name": "io.github.adam121393/package-intel",
   "title": "Package Intel",
   "description": "npm, PyPI & crates.io health, vulns and dependency graphs. Runs locally, no API key.",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "websiteUrl": "https://github.com/adam121393/package-intel",
   "repository": {
     "url": "https://github.com/adam121393/package-intel",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "package-intel-mcp",
-      "version": "1.1.0",
+      "version": "1.1.1",
       "transport": {
         "type": "stdio"
       },

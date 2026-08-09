@@ -1,6 +1,6 @@
 {
   "name": "package-intel-mcp",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "mcpName": "io.github.adam121393/package-intel",
   "description": "MCP server giving coding agents npm, PyPI and crates.io package health, vulnerability, dependency-graph and download data. Free and zero-config; an optional wallet or a USDC transaction hash unlocks paid consolidated risk scores over x402.",
   "type": "module",
@@ -15,7 +15,8 @@
     "node": ">=20.12"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
     "prepack": "npm run build"
   },
   "keywords": [
@@ -37,16 +38,15 @@
     "directory": "mcp-client"
   },
   "homepage": "https://github.com/adam121393/package-intel#readme",
-  "dependencies": {
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.3",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@x402/axios": "~2.20.0",
     "@x402/evm": "~2.20.0",
     "axios": "^1.19.0",
     "viem": "^2.55.10",
     "zod": "^3.24.2"
-  },
-  "devDependencies": {
-    "@types/node": "^22.13.4",
-    "typescript": "^5.7.3"
   }
 }
