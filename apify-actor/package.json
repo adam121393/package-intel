@@ -1,0 +1,18 @@
+{
+  "name": "package-intelligence-actor",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Bulk npm, PyPI and crates.io package intelligence as an Apify dataset.",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/apify-actor/src/main.js"
+  },
+  "dependencies": {
+    "apify": "^3.2.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3"
+  }
+}

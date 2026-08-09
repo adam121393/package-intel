@@ -1,0 +1,57 @@
+{
+  "actorSpecification": 1,
+  "fields": {},
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "ecosystem",
+          "name",
+          "version",
+          "healthScore",
+          "vulnerabilityCount",
+          "maxSeverity",
+          "deprecated",
+          "license",
+          "weeklyDownloads",
+          "lastPublish",
+          "found"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "ecosystem": { "label": "Ecosystem" },
+          "name": { "label": "Package" },
+          "version": { "label": "Version" },
+          "healthScore": { "label": "Health" },
+          "vulnerabilityCount": { "label": "Advisories" },
+          "maxSeverity": { "label": "Worst severity" },
+          "deprecated": { "label": "Deprecated" },
+          "license": { "label": "Licence" },
+          "weeklyDownloads": { "label": "Weekly downloads" },
+          "lastPublish": { "label": "Last publish" },
+          "found": { "label": "Found" }
+        }
+      }
+    },
+    "risk": {
+      "title": "Risk only",
+      "transformation": {
+        "fields": [
+          "ecosystem",
+          "name",
+          "version",
+          "vulnerabilityCount",
+          "maxSeverity",
+          "vulnerabilityIds",
+          "deprecated",
+          "deprecatedReason",
+          "securityScore"
+        ]
+      },
+      "display": { "component": "table" }
+    }
+  }
+}

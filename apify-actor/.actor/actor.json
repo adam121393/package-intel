@@ -1,0 +1,15 @@
+{
+  "actorSpecification": 1,
+  "name": "package-intelligence",
+  "title": "npm, PyPI & crates.io Package Intelligence",
+  "description": "Bulk package health, vulnerabilities and dependency data for npm, PyPI and crates.io. One row per package: version, licence, maintainers, downloads, OSV advisories, deps.dev dependency counts, and a 0-100 health score.",
+  "version": "0.1",
+  "meta": {
+    "templateId": "ts-start"
+  },
+  "input": "./input_schema.json",
+  "dockerfile": "../Dockerfile",
+  "storages": {
+    "dataset": "./dataset_schema.json"
+  }
+}

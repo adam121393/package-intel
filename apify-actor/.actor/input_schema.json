@@ -1,0 +1,40 @@
+{
+  "title": "Package Intelligence input",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "packages": {
+      "title": "Packages",
+      "type": "array",
+      "description": "Package names to check. Prefix with an ecosystem to mix them in one run — npm:express, pypi:requests, crates:serde. Unprefixed names use the default ecosystem below.",
+      "editor": "stringList",
+      "prefill": ["express", "npm:lodash", "pypi:requests", "crates:serde"],
+      "example": ["express", "pypi:django"]
+    },
+    "ecosystem": {
+      "title": "Default ecosystem",
+      "type": "string",
+      "description": "Used for any package name without an ecosystem prefix.",
+      "editor": "select",
+      "default": "npm",
+      "enum": ["npm", "pypi", "crates"],
+      "enumTitles": ["npm", "PyPI", "crates.io (Rust)"]
+    },
+    "includeDependencies": {
+      "title": "Include dependency graph",
+      "type": "boolean",
+      "description": "Adds direct, transitive and deprecated dependency counts from deps.dev. Costs one extra upstream call per package, so runs take longer.",
+      "default": false
+    },
+    "maxConcurrency": {
+      "title": "Concurrency",
+      "type": "integer",
+      "description": "Packages fetched in parallel. Higher is faster but heavier on the public registries this reads from.",
+      "default": 5,
+      "minimum": 1,
+      "maximum": 10,
+      "unit": "packages"
+    }
+  },
+  "required": ["packages"]
+}

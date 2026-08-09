@@ -46,3 +46,8 @@ Untitled.*
 
 # Local task/scratch notes dropped in this folder
 Task for *.md
+
+# Apify Actor build output and deps
+apify-actor/node_modules
+apify-actor/dist
+apify-actor/storage

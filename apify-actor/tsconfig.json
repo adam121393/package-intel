@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "../",
+    "lib": ["ES2023"],
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "../src/**/*.ts"],
+  "exclude": ["../src/proxy-worker.ts", "../src/worker.ts", "../src/app.ts", "../src/server.ts", "../src/freeApp.ts", "../src/routes/**", "../src/payment/**", "../src/catalog.ts", "../src/config.ts", "../src/rateLimit.ts", "../src/callLog.ts"]
+}
