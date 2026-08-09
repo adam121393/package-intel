@@ -1,0 +1,44 @@
+# Build context sent to the remote builder.
+#
+# .env is first for a reason: it holds the CDP API secret and, on this machine,
+# a wallet private key. The Dockerfile never COPYs it, so it would not reach the
+# image — but without this line it is still uploaded to a third-party builder.
+# Secrets belong in `fly secrets set`, never in a build context.
+.env
+.env.*
+!.env.example
+.npmrc
+.dev.vars
+*.pem
+*secret*.txt
+*api*.txt
+cdp_wallet_secret.txt
+cdp_api_key.json
+
+# Reinstalled inside the image from the lockfile; uploading ~120MB of it makes
+# every deploy slow and changes nothing.
+node_modules
+mcp-client/node_modules
+
+# Payment state and logs are machine-local, and the ledger is mounted at /data.
+.used-tx.log
+*.log
+
+# Not part of the API service.
+mcp-client
+test
+docs
+.wrangler
+.claude
+.obsidian
+*.mcpb
+
+# Build outputs, regenerated in the image.
+dist
+
+# Repository metadata the build does not need.
+.git
+.github
+.gitignore
+*.md
+!README.md
