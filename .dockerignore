@@ -17,8 +17,7 @@ cdp_api_key.json
 
 # Reinstalled inside the image from the lockfile; uploading ~120MB of it makes
 # every deploy slow and changes nothing.
-node_modules
-mcp-client/node_modules
+**/node_modules
 
 # Payment state and logs are machine-local, and the ledger is mounted at /data.
 .used-tx.log
@@ -33,8 +32,9 @@ docs
 .obsidian
 *.mcpb
 
-# Build outputs, regenerated in the image.
-dist
+# Build outputs, regenerated in the image. `**/` because a bare name matches
+# only at the context root, which let apify-actor/dist ship a stale build.
+**/dist
 
 # Repository metadata the build does not need.
 .git
