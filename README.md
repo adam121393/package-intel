@@ -1,18 +1,18 @@
 # Package & Dependency Intelligence API (x402)
 
-A pay-per-call API selling npm/PyPI package health, dependency-graph, and vulnerability
-data to AI coding agents over the [x402](https://github.com/x402-foundation/x402) payment
-protocol — plus an MCP server so agents in Claude Desktop/Cursor can call it and pay
-automatically.
+A pay-per-call API selling npm, PyPI and crates.io (Rust) package health, dependency-graph,
+and vulnerability data to AI coding agents over the
+[x402](https://github.com/x402-foundation/x402) payment protocol — plus an MCP server so
+agents in Claude Desktop/Cursor can call it and pay automatically.
 
 Defaults to **Base Sepolia testnet** via the free public facilitator. Going to mainnet is
 an explicit config change (see [Going to mainnet](#going-to-mainnet)).
 
 ## Endpoints
 
-Raw passthrough of the upstream sources is **free**: npm, PyPI, OSV and deps.dev are
-themselves free and unauthenticated, so charging for a relay of them prices against zero.
-What gets charged for is the consolidation — the score.
+Raw passthrough of the upstream sources is **free**: npm, PyPI, crates.io, OSV and deps.dev
+are themselves free and unauthenticated, so charging for a relay of them prices against
+zero. What gets charged for is the consolidation — the score.
 
 | Endpoint | Method | Price | Returns |
 |---|---|---|---|
@@ -23,8 +23,8 @@ What gets charged for is the consolidation — the score.
 | `/v1/health/:ecosystem/:name` | GET | $0.01 | Health/risk score 0-100 |
 | `/v1/batch` | POST | $0.02 | Batched health scores (≤50 packages) |
 
-`:ecosystem` is `npm` or `pypi`. Also unpaid: `/healthz`, `/v1/sample` (canned example
-response), `/.well-known/x402` (discovery manifest).
+`:ecosystem` is `npm`, `pypi` or `crates`. Also unpaid: `/healthz`, `/v1/sample` (canned
+example response), `/.well-known/x402` (discovery manifest).
 
 Free routes are rate limited to **60/min and 2000/day per caller** — a runaway agent loop
 is how we would get our egress IP blocked by npm or OSV. Paid routes are exempt; their
