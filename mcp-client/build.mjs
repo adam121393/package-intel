@@ -23,7 +23,11 @@
  *    supported". The createRequire shim below restores it.
  */
 
+import { readFileSync } from "node:fs";
 import { build } from "esbuild";
+
+// Single source of truth for the version reported in the MCP handshake.
+const { version } = JSON.parse(readFileSync(new URL("package.json", import.meta.url), "utf8"));
 
 const banner = [
   "#!/usr/bin/env node",
@@ -40,6 +44,7 @@ const result = await build({
   format: "esm",
   target: "node20",
   banner: { js: banner },
+  define: { __PKG_VERSION__: JSON.stringify(version) },
   // Keeps the output readable enough to audit, which matters for something
   // people run locally against their own dependency lists.
   minify: false,

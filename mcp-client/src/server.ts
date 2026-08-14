@@ -188,7 +188,16 @@ async function callApi(
   }
 }
 
-const mcp = new McpServer({ name: "package-intel", version: "1.0.0" });
+// Injected by build.mjs from package.json. This was hardcoded, and drifted three
+// releases behind the published package — so the version every client reports in
+// its handshake (Claude Desktop, Cursor, the registry crawlers) bore no relation
+// to the version actually installed, and a bug report could not be tied to one.
+declare const __PKG_VERSION__: string;
+// tsx runs this file unbundled (`npm run mcp`), where the define never happens.
+// `typeof` on an undeclared name is the one read that does not throw.
+const VERSION = typeof __PKG_VERSION__ === "string" ? __PKG_VERSION__ : "0.0.0-dev";
+
+const mcp = new McpServer({ name: "package-intel", version: VERSION });
 
 const readOnly = { readOnlyHint: true, openWorldHint: true };
 
